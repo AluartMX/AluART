@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>AluARTmx - Prueba 9</title>
+<script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#000;color:white;font-family:Arial,sans-serif}#top{position:fixed;z-index:12;top:12px;left:10px;right:10px;background:#101820dc;padding:12px;border-radius:12px;text-align:center;font-size:13px;pointer-events:none}#top strong{font-size:17px}#controls{position:fixed;z-index:15;bottom:12px;left:10px;right:10px;background:#111d;border:1px solid #ffffff44;border-radius:14px;padding:12px;max-height:43vh;overflow:auto}#controls header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}button{background:#263b3d;border:1px solid #8bd9cb;color:white;border-radius:9px;padding:9px;font-size:13px}button:active{background:#3d6562}.line{display:flex;align-items:center;gap:8px;margin:7px 0}.line label{min-width:74px;font-size:13px}.line input{flex:1;min-width:0;accent-color:#39d7b5}.val{width:49px;text-align:right;font-size:12px}.actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}.small{font-size:11px;color:#d0d0d0;margin-top:8px}#err{color:#ffb0a8}a-scene{position:fixed!important;inset:0}body.mini #settings{display:none}
+</style>
+</head>
+<body>
+<div id="top"><strong>AluARTmx · Prueba 9</strong><div id="status">Preparando cámara y seguimiento…</div><div id="err"></div></div>
+<div id="controls"><header><b>Calibración de video</b><button id="collapse">Ocultar ajustes</button></header><div id="settings">
+<div class="line"><label for="scale">Tamaño</label><input id="scale" type="range" min="0.65" max="1.2" step="0.005" value="0.9"><span class="val" id="scaleVal"></span></div>
+<div class="line"><label for="x">Mover X</label><input id="x" type="range" min="-0.25" max="0.25" step="0.005" value="0"><span class="val" id="xVal"></span></div>
+<div class="line"><label for="y">Mover Y</label><input id="y" type="range" min="-0.35" max="0.35" step="0.005" value="0"><span class="val" id="yVal"></span></div>
+<div class="line"><label for="rotation">Giro</label><input id="rotation" type="range" min="-15" max="15" step="0.5" value="0"><span class="val" id="rotationVal"></span></div>
+<div class="actions"><button id="frame">Ocultar marco</button><button id="videoToggle">Ocultar video</button><button id="sound">Activar sonido</button><button id="reset">Restablecer</button><button id="save">Guardar en este celular</button></div>
+<div class="small">La configuración guardada aquí es solo de diagnóstico, en este navegador. Aún no se sincroniza con Supabase ni modifica los QR de clientes.</div>
+</div></div>
+<script>
+(function(){
+'use strict';
+const q=new URLSearchParams(location.search),target=q.get('target'),videoURL=q.get('video'),orientacion=q.get('orientacion')||'vertical';
+const status=document.getElementById('status'),err=document.getElementById('err');
+if(!target||!videoURL){status.textContent='Faltan parámetros en el enlace.';err.textContent='Abre esta prueba usando los parámetros target y video del enlace de la Prueba 8.';return;}
+const key='aluart-prueba9-'+(q.get('id')||target);
+const defaults={scale:.9,x:0,y:0,rotation:0};let settings={...defaults};
+try{settings={...settings,...JSON.parse(localStorage.getItem(key)||'{}')}}catch(e){}
+for(const [k,def] of Object.entries(defaults)){const el=document.getElementById(k);settings[k]=Number.isFinite(+settings[k])?Math.min(+el.max,Math.max(+el.min,+settings[k])):def;el.value=settings[k];}
+let w=1,h=orientacion==='horizontal'?2/3:1.5,tracked=false,showFrame=true,showVideo=true,unmuted=false;
+const vid=document.createElement('video');vid.id='videoAR';vid.src=videoURL;vid.loop=true;vid.muted=true;vid.playsInline=true;vid.setAttribute('webkit-playsinline','');vid.preload='auto';vid.crossOrigin='anonymous';vid.style.display='none';document.body.appendChild(vid);
+const scene=document.createElement('a-scene');scene.setAttribute('mindar-image',`imageTargetSrc: ${target}; autoStart: true; filterMinCF: 0.01; filterBeta: 1`);scene.setAttribute('embedded','');scene.setAttribute('color-space','sRGB');scene.setAttribute('renderer','colorManagement: true; physicallyCorrectLights: false; antialias: true');scene.setAttribute('vr-mode-ui','enabled: false');scene.setAttribute('device-orientation-permission-ui','enabled: false');
+const assets=document.createElement('a-assets');scene.appendChild(assets);
+const camera=document.createElement('a-camera');camera.setAttribute('position','0 0 0');camera.setAttribute('look-controls','enabled: false');scene.appendChild(camera);
+const anchor=document.createElement('a-entity');anchor.setAttribute('mindar-image-target','targetIndex: 0');scene.appendChild(anchor);
+const plane=document.createElement('a-plane');plane.setAttribute('material','shader: flat; src: #videoAR; side: double; transparent: true');plane.setAttribute('position','0 0 0.002');anchor.appendChild(plane);
+const outline=document.createElement('a-entity');anchor.appendChild(outline);
+document.body.appendChild(scene);
+function drawOutline(){if(!outline.object3D)return;const THREE=AFRAME.THREE;const p=[[-w/2,-h/2,0],[w/2,-h/2,0],[w/2,h/2,0],[-w/2,h/2,0],[-w/2,-h/2,0]];const geo=new THREE.BufferGeometry().setFromPoints(p.map(a=>new THREE.Vector3(...a)));const old=outline.object3D.getObjectByName('diagnostic');if(old){outline.object3D.remove(old);old.geometry.dispose();old.material.dispose()}const line=new THREE.Line(geo,new THREE.LineBasicMaterial({color:0x2dff6c,depthTest:false}));line.name='diagnostic';line.renderOrder=999;outline.object3D.add(line);outline.object3D.visible=showFrame;}
+function update(){plane.setAttribute('geometry',{primitive:'plane',width:w*settings.scale,height:h*settings.scale});plane.setAttribute('position',`${settings.x} ${settings.y} 0.002`);plane.setAttribute('rotation',`0 0 ${settings.rotation}`);plane.setAttribute('visible',showVideo);for(const k of Object.keys(defaults))document.getElementById(k+'Val').textContent=String(settings[k]);}
+function attemptDimensions(){const sys=scene.systems['mindar-image-system'],controller=sys&&sys.controller;const dims=controller&&controller.imageTargetDimensions;if(!dims||!dims[0])return false;const d=dims[0],a=Number(Array.isArray(d)?d[0]:d.width),b=Number(Array.isArray(d)?d[1]:d.height);if(!(a>0&&b>0))return false;h=b/a;w=1;drawOutline();update();return true;}
+function startVideo(){if(!tracked)return;vid.play().catch(()=>{status.textContent='Toca «Activar sonido» o la pantalla para permitir reproducir el video.'})}
+anchor.addEventListener('targetFound',()=>{tracked=true;status.textContent='Cuadro reconocido · observa las esquinas';attemptDimensions();startVideo()});
+anchor.addEventListener('targetLost',()=>{tracked=false;status.textContent='Buscando fotografía…';vid.pause()});
+scene.addEventListener('loaded',()=>{drawOutline();update();status.textContent='Buscando fotografía…';setTimeout(attemptDimensions,1300)});
+scene.addEventListener('arError',e=>{err.textContent='Error al iniciar AR: revisa los permisos de cámara y los enlaces.';console.error(e)});
+vid.addEventListener('loadedmetadata',()=>{const ar=vid.videoWidth/vid.videoHeight,planeAR=w/h;const tex=plane.getObject3D('mesh')?.material?.map;if(tex){if(ar>planeAR){tex.repeat.set(planeAR/ar,1);tex.offset.set((1-planeAR/ar)/2,0)}else{tex.repeat.set(1,ar/planeAR);tex.offset.set(0,(1-ar/planeAR)/2)}tex.needsUpdate=true;}});
+for(const k of Object.keys(defaults))document.getElementById(k).addEventListener('input',e=>{settings[k]=Number(e.target.value);update()});
+document.getElementById('collapse').onclick=()=>{document.body.classList.toggle('mini');document.getElementById('collapse').textContent=document.body.classList.contains('mini')?'Mostrar ajustes':'Ocultar ajustes'};
+document.getElementById('frame').onclick=e=>{showFrame=!showFrame;outline.object3D.visible=showFrame;e.target.textContent=showFrame?'Ocultar marco':'Mostrar marco'};
+document.getElementById('videoToggle').onclick=e=>{showVideo=!showVideo;update();e.target.textContent=showVideo?'Ocultar video':'Mostrar video'};
+document.getElementById('sound').onclick=e=>{unmuted=!unmuted;vid.muted=!unmuted;e.target.textContent=unmuted?'Silenciar':'Activar sonido';startVideo()};
+document.getElementById('reset').onclick=()=>{settings={...defaults};for(const k of Object.keys(defaults))document.getElementById(k).value=settings[k];update()};
+document.getElementById('save').onclick=()=>{try{localStorage.setItem(key,JSON.stringify(settings));status.textContent='Ajustes guardados en este navegador (solo prueba)'}catch(e){err.textContent='No se pudo guardar en este navegador.'}};
+document.addEventListener('pointerdown',()=>{if(tracked&&vid.paused)startVideo()},{passive:true});
+})();
+</script>
+</body>
+</html>
