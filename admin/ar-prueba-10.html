@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>AluARTmx AR - Prueba 10</title>
+<script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+<style>
+html,body{margin:0;width:100%;height:100%;background:#000;font-family:Arial,sans-serif;overflow:hidden}
+#estado{position:fixed;top:env(safe-area-inset-top,10px);left:50%;transform:translateX(-50%);z-index:9999;max-width:90%;padding:8px 13px;border-radius:22px;background:#000a;color:white;text-align:center;font-size:12px;pointer-events:none}
+#sonido{position:fixed;bottom:calc(15px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);z-index:9999;background:#171717dd;color:white;border:1px solid #888;border-radius:24px;padding:11px 18px;font-size:13px}
+.a-enter-vr-button{display:none!important}
+</style>
+</head>
+<body>
+<div id="estado">Iniciando AluARTmx AR...</div>
+<button id="sonido" type="button">🔇 Activar sonido</button>
+<script>
+(async function(){
+ 'use strict';
+ const q=new URLSearchParams(location.search);
+ const targetUrl=q.get('target');
+ const videoUrl=q.get('video');
+ const orientacion=q.get('orientacion')||'vertical';
+ const estado=document.getElementById('estado');
+ const mensaje=s=>estado.textContent=s;
+ if(!targetUrl||!videoUrl){mensaje('Faltan target y video en el enlace.');return;}
+
+ // Proporción del archivo original del cuadro: 853 x 1280 (vertical).
+ // Para otros proyectos, el administrador podrá enviar ancho/alto en el enlace.
+ const wParam=Number(q.get('ancho'));
+ const hParam=Number(q.get('alto'));
+ const proporcion=(wParam>0&&hParam>0)?hParam/wParam:
+   (orientacion==='horizontal'?2/3:1280/853);
+ const ancho=1;
+ const alto=proporcion;
+ const escalaVideo=0.98;
+ let reconocido=false;
+
+ const escena=document.createElement('a-scene');
+ // Ajuste experimental: prioriza respuesta, conservando filtrado moderado.
+ escena.setAttribute('mindar-image',`imageTargetSrc: ${targetUrl}; filterMinCF: 0.08; filterBeta: 0.6`);
+ escena.setAttribute('vr-mode-ui','enabled: false');
+ escena.setAttribute('device-orientation-permission-ui','enabled: false');
+ escena.setAttribute('renderer','colorManagement: true');
+
+ const assets=document.createElement('a-assets');
+ const video=document.createElement('video');
+ video.id='videoAR';
+ video.src=videoUrl;
+ video.crossOrigin='anonymous';
+ video.preload='auto';
+ video.muted=true;
+ video.defaultMuted=true;
+ video.playsInline=true;
+ video.setAttribute('playsinline','');
+ video.setAttribute('webkit-playsinline','');
+ video.setAttribute('muted','');
+ assets.appendChild(video);
+
+ const camara=document.createElement('a-camera');
+ camara.setAttribute('position','0 0 0');
+ camara.setAttribute('look-controls','enabled: false');
+
+ const target=document.createElement('a-entity');
+ target.setAttribute('mindar-image-target','targetIndex: 0');
+ const plano=document.createElement('a-video');
+ plano.setAttribute('src','#videoAR');
+ plano.setAttribute('position','0 0 0.001');
+ plano.setAttribute('rotation','0 0 0');
+ plano.setAttribute('geometry',{primitive:'plane',width:ancho*escalaVideo,height:alto*escalaVideo});
+ plano.setAttribute('material','shader: flat; src: #videoAR; side: double; transparent: true');
+ target.appendChild(plano);
+ escena.appendChild(assets);
+ escena.appendChild(camara);
+ escena.appendChild(target);
+ document.body.appendChild(escena);
+
+ // Recorte centrado para llenar la proporción del cuadro sin deformar el video.
+ function ajustarTextura(){
+  const mesh=plano.getObject3D('mesh');
+  if(!mesh||!mesh.material||!mesh.material.map||!video.videoWidth||!video.videoHeight)return;
+  const t=mesh.material.map;
+  const cuadro=ancho/alto;
+  const rel=video.videoWidth/video.videoHeight;
+  let rx=1,ry=1;
+  if(rel>cuadro)rx=cuadro/rel;
+  else ry=rel/cuadro;
+  t.repeat.set(rx,ry);
+  t.offset.set((1-rx)/2,(1-ry)/2);
+  t.needsUpdate=true;
+ }
+ video.addEventListener('loadedmetadata',ajustarTextura);
+ plano.addEventListener('object3dset',ajustarTextura);
+ escena.addEventListener('arReady',()=>mensaje('Apunta a tu fotografía'));
+ escena.addEventListener('arError',e=>{console.error(e);mensaje('No se pudo iniciar la cámara');});
+ target.addEventListener('targetFound',async()=>{
+  reconocido=true;
+  mensaje('Fotografía reconocida');
+  ajustarTextura();
+  try{await video.play();}
+  catch(e){console.warn('Reproducción:',e);mensaje('Fotografía reconocida · toca Activar sonido');}
+ });
+ target.addEventListener('targetLost',()=>{
+  reconocido=false;
+  video.pause();
+  mensaje('Apunta a tu fotografía');
+ });
+ video.addEventListener('error',()=>mensaje('No se pudo cargar el video'));
+ document.getElementById('sonido').addEventListener('click',async e=>{
+  video.muted=!video.muted;
+  video.volume=1;
+  e.currentTarget.textContent=video.muted?'🔇 Activar sonido':'🔊 Sonido activado';
+  if(reconocido){try{await video.play();}catch(err){console.warn(err);}}
+ });
+})();
+</script>
+</body>
+</html>
