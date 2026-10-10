@@ -89,22 +89,6 @@
     </small>
 
     <div class="preview-grid"><div class="preview-box" id="vistaFoto">🖼️<span>Vista previa de foto</span></div><div class="preview-box" id="vistaVideo">🎬<span>Vista previa de video</span></div></div>
-    <label for="archivoMind">
-      📁 Archivo .mind existente (opcional)
-    </label>
-
-    <input
-      type="file"
-      id="archivoMind"
-      accept=".mind,application/octet-stream"
-    >
-
-    <small>
-      Si ya tienes un archivo .mind, puedes utilizarlo.
-      Si seleccionas fotografía y .mind, tendrá
-      prioridad el archivo .mind.
-    </small>
-
     <label for="archivoVideo" id="labelVideo">
       🎬 Agregar video vertical
     </label>
@@ -138,7 +122,7 @@
   </div>
 
   <div class="card">
-    <h2>▦ Mis experiencias</h2><p class="sub">Consulta tus cuadros y descarga sus códigos QR.</p><label for="buscar">Buscar por cliente o ID</label><input class="search" type="text" id="buscar" placeholder="Buscar experiencias..."><div class="results-count" id="contador"></div><div id="lista"></div><p class="note">Nota: esta lista se guarda en este navegador. Los archivos de cada cuadro se guardan en Supabase.</p>
+    <h2>▦ Mis experiencias</h2><p class="sub">Consulta tus cuadros y descarga sus códigos QR.</p><label for="buscar">Buscar por cliente o ID</label><input class="search" type="text" id="buscar" placeholder="Escribe el nombre del cliente o el ID del cuadro..."><div class="results-count" id="contador"></div><div id="lista"></div><p class="note">Nota: esta lista se guarda en este navegador. Los archivos de cada cuadro se guardan en Supabase.</p>
   </div>
 </div>
 </div>
@@ -183,9 +167,6 @@ const inputNombre =
 
 const inputFoto =
   document.getElementById('archivoFoto');
-
-const inputMind =
-  document.getElementById('archivoMind');
 
 const inputVideo =
   document.getElementById('archivoVideo');
@@ -679,9 +660,6 @@ botonCrear.addEventListener(
     const archivoFoto =
       inputFoto.files[0];
 
-    const archivoMind =
-      inputMind.files[0];
-
     const archivoVideo =
       inputVideo.files[0];
 
@@ -690,10 +668,9 @@ botonCrear.addEventListener(
       return;
     }
 
-    if (!archivoFoto && !archivoMind) {
+    if (!archivoFoto) {
       alert(
-        'Selecciona una fotografía JPG/PNG ' +
-        'o un archivo .mind.'
+        'Selecciona una fotografía JPG o PNG.'
       );
       return;
     }
@@ -703,21 +680,7 @@ botonCrear.addEventListener(
       return;
     }
 
-    if (
-      archivoMind &&
-      !archivoMind.name.toLowerCase().endsWith('.mind')
-    ) {
-      alert('El archivo Target debe ser .mind.');
-      return;
-    }
-
-    if (
-      !archivoMind &&
-      archivoFoto &&
-      !['image/jpeg', 'image/png'].includes(
-        archivoFoto.type
-      )
-    ) {
+    if (!['image/jpeg', 'image/png'].includes(archivoFoto.type)) {
       alert('La fotografía debe ser JPG o PNG.');
       return;
     }
@@ -747,17 +710,8 @@ botonCrear.addEventListener(
 
     try {
 
-      let targetParaSubir = archivoMind;
-
-      if (!targetParaSubir) {
-
-        mostrarEstado(
-          '📷 Preparando fotografía para MindAR...'
-        );
-
-        targetParaSubir =
-          await compilarFotoAMind(archivoFoto);
-      }
+      mostrarEstado('📷 Preparando fotografía para MindAR...');
+      const targetParaSubir = await compilarFotoAMind(archivoFoto);
 
       mostrarEstado(
         '☁️ Subiendo archivo .mind a Supabase...'
@@ -816,7 +770,6 @@ botonCrear.addEventListener(
 
       inputNombre.value = '';
       inputFoto.value = '';
-      inputMind.value = '';
       inputVideo.value = '';
 
       dimensionesVideo = null;
@@ -888,7 +841,7 @@ function renderizarLista() {
 
     lista.innerHTML =
       '<div id="sinProyectos">' +
-      'Todavía no tienes cuadros creados.' +
+      'No hay cuadros que coincidan con la búsqueda.' +
       '</div>';
 
     return;
@@ -908,7 +861,7 @@ function renderizarLista() {
         p.orientacion || 'No especificada';
 
       div.innerHTML = `
-        <h3>🖼️ Cuadro ${escapeHTML(p.id)}</h3>
+        <h3>🖼️ ${escapeHTML(p.name || "Cliente sin nombre")}</h3><small>ID del cuadro: ${escapeHTML(p.id)}</small>
 
         <div class="info">
 
