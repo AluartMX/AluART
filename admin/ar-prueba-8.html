@@ -1,8 +1,10 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>AluARTmx AR - Prueba 7</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>AluARTmx AR - Prueba 8</title>
 <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
 <style>
@@ -15,8 +17,12 @@ button{background:#171717dd;color:white;border:1px solid #aaa;border-radius:24px
 </style>
 </head>
 <body>
-<div id="panel"><strong>AluARTmx · Prueba 7</strong><span id="estado">Iniciando...</span></div>
-<div id="controles"><button id="sonido">🔇 Activar sonido</button><button id="marco">🟩 Ocultar marco</button><button id="modo">🎬 Mostrar solo marco</button></div>
+<div id="panel"><strong>AluARTmx · Prueba 8</strong><span id="estado">Iniciando...</span></div>
+<div id="controles">
+<button id="sonido">🔇 Activar sonido</button>
+<button id="marco">🟩 Ocultar marco</button>
+<button id="modo">🎬 Mostrar solo marco</button>
+</div>
 <script>
 (async function(){
  const q=new URLSearchParams(location.search);
@@ -24,81 +30,231 @@ button{background:#171717dd;color:white;border:1px solid #aaa;border-radius:24px
  const orientacion=q.get('orientacion')||'vertical';
  const estado=document.getElementById('estado');
  const mensaje=s=>estado.textContent=s;
- if(!targetUrl||!videoUrl){mensaje('Faltan target y video en el enlace.');return;}
+
+ if(!targetUrl||!videoUrl){
+  mensaje('Faltan target y video en el enlace.');
+  return;
+ }
+
  let ancho=1,alto=orientacion==='horizontal'?2/3:1.5;
  let dimensionesReales=false,visible=false,mostrarMarco=true,mostrarVideo=true;
  const escalaVideo=0.90;
+
  const escena=document.createElement('a-scene');
- escena.setAttribute('mindar-image',`imageTargetSrc: ${targetUrl}; filterMinCF: 0.005; filterBeta: 0.05`);
+
+ // PRUEBA 8: parámetros experimentales para reducir el retraso.
+ escena.setAttribute('mindar-image',`imageTargetSrc: ${targetUrl}; filterMinCF: 0.1; filterBeta: 0.5`);
+
  escena.setAttribute('vr-mode-ui','enabled: false');
  escena.setAttribute('device-orientation-permission-ui','enabled: false');
  escena.setAttribute('renderer','colorManagement: true');
+
  const assets=document.createElement('a-assets');
  const video=document.createElement('video');
- video.id='videoAR';video.src=videoUrl;video.crossOrigin='anonymous';video.preload='auto';video.muted=true;video.defaultMuted=true;video.playsInline=true;
- video.setAttribute('playsinline','');video.setAttribute('webkit-playsinline','');video.setAttribute('muted','');
+ video.id='videoAR';
+ video.src=videoUrl;
+ video.crossOrigin='anonymous';
+ video.preload='auto';
+ video.muted=true;
+ video.defaultMuted=true;
+ video.playsInline=true;
+ video.setAttribute('playsinline','');
+ video.setAttribute('webkit-playsinline','');
+ video.setAttribute('muted','');
  assets.appendChild(video);
- const camara=document.createElement('a-camera');camara.setAttribute('position','0 0 0');camara.setAttribute('look-controls','enabled: false');
- const target=document.createElement('a-entity');target.setAttribute('mindar-image-target','targetIndex: 0');
- // Video y marco están en el MISMO sistema de coordenadas del target.
- // Sin rotaciones artificiales ni desplazamientos laterales.
- const plano=document.createElement('a-video');plano.setAttribute('src','#videoAR');
- plano.setAttribute('position','0 0 0.001');plano.setAttribute('rotation','0 0 0');
+
+ const camara=document.createElement('a-camera');
+ camara.setAttribute('position','0 0 0');
+ camara.setAttribute('look-controls','enabled: false');
+
+ const target=document.createElement('a-entity');
+ target.setAttribute('mindar-image-target','targetIndex: 0');
+
+ // Video y marco comparten el sistema de coordenadas del target.
+ const plano=document.createElement('a-video');
+ plano.setAttribute('src','#videoAR');
+ plano.setAttribute('position','0 0 0.001');
+ plano.setAttribute('rotation','0 0 0');
  plano.setAttribute('material','shader: flat; src: #videoAR; side: double; transparent: true');
+
  const diagnostico=document.createElement('a-entity');
+
  function linea(x1,y1,x2,y2,color){
-  const geo=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(x1,y1,0.006),new THREE.Vector3(x2,y2,0.006)]);
+  const geo=new THREE.BufferGeometry().setFromPoints([
+   new THREE.Vector3(x1,y1,0.006),
+   new THREE.Vector3(x2,y2,0.006)
+  ]);
   const mat=new THREE.LineBasicMaterial({color,depthTest:false});
-  const objeto=new THREE.Line(geo,mat);objeto.renderOrder=999;
-  const e=document.createElement('a-entity');e.setObject3D('mesh',objeto);diagnostico.appendChild(e);
+  const objeto=new THREE.Line(geo,mat);
+  objeto.renderOrder=999;
+  const e=document.createElement('a-entity');
+  e.setObject3D('mesh',objeto);
+  diagnostico.appendChild(e);
  }
+
  function dibujarMarco(){
-  while(diagnostico.firstChild)diagnostico.removeChild(diagnostico.firstChild);
+  while(diagnostico.firstChild)
+   diagnostico.removeChild(diagnostico.firstChild);
+
   const x=ancho/2,y=alto/2,l=Math.min(ancho,alto)*.12;
-  linea(-x,-y,x,-y,0x00ff00);linea(x,-y,x,y,0x00ff00);linea(x,y,-x,y,0x00ff00);linea(-x,y,-x,-y,0x00ff00);
-  const esquina=(cx,cy,sx,sy,c)=>{linea(cx,cy,cx+sx*l,cy,c);linea(cx,cy,cx,cy+sy*l,c)};
-  esquina(-x,y,1,-1,0xff0000);esquina(x,y,-1,-1,0xffff00);
-  esquina(-x,-y,1,1,0x00ffff);esquina(x,-y,-1,1,0xff00ff);
+
+  linea(-x,-y,x,-y,0x00ff00);
+  linea(x,-y,x,y,0x00ff00);
+  linea(x,y,-x,y,0x00ff00);
+  linea(-x,y,-x,-y,0x00ff00);
+
+  const esquina=(cx,cy,sx,sy,c)=>{
+   linea(cx,cy,cx+sx*l,cy,c);
+   linea(cx,cy,cx,cy+sy*l,c);
+  };
+
+  esquina(-x,y,1,-1,0xff0000);
+  esquina(x,y,-1,-1,0xffff00);
+  esquina(-x,-y,1,1,0x00ffff);
+  esquina(x,-y,-1,1,0xff00ff);
  }
+
  function ajustarTextura(){
-  const mesh=plano.getObject3D('mesh');if(!mesh||!mesh.material||!mesh.material.map||!video.videoWidth||!video.videoHeight)return;
-  const t=mesh.material.map,cuadro=ancho/alto,rel=video.videoWidth/video.videoHeight;
-  let rx=1,ry=1;if(rel>cuadro)rx=cuadro/rel;else ry=rel/cuadro;
-  t.repeat.set(rx,ry);t.offset.set((1-rx)/2,(1-ry)/2);t.needsUpdate=true;
+  const mesh=plano.getObject3D('mesh');
+  if(!mesh||!mesh.material||!mesh.material.map||
+     !video.videoWidth||!video.videoHeight)return;
+
+  const t=mesh.material.map;
+  const cuadro=ancho/alto;
+  const rel=video.videoWidth/video.videoHeight;
+
+  let rx=1,ry=1;
+  if(rel>cuadro)rx=cuadro/rel;
+  else ry=rel/cuadro;
+
+  t.repeat.set(rx,ry);
+  t.offset.set((1-rx)/2,(1-ry)/2);
+  t.needsUpdate=true;
  }
- function actualizar(){plano.setAttribute('geometry',{primitive:'plane',width:ancho*escalaVideo,height:alto*escalaVideo});dibujarMarco();ajustarTextura();}
+
+ function actualizar(){
+  plano.setAttribute('geometry',{
+   primitive:'plane',
+   width:ancho*escalaVideo,
+   height:alto*escalaVideo
+  });
+  dibujarMarco();
+  ajustarTextura();
+ }
+
  function leerDimensiones(){
-  const sistema=escena.systems['mindar-image-system'];const ctrl=sistema&&sistema.controller;
+  const sistema=escena.systems['mindar-image-system'];
+  const ctrl=sistema&&sistema.controller;
   const dims=ctrl&&ctrl.imageTargetDimensions;
+
   if(!Array.isArray(dims)||!dims.length)return false;
-  const d=dims[0];const w=Number(Array.isArray(d)?d[0]:d&&d.width),h=Number(Array.isArray(d)?d[1]:d&&d.height);
+
+  const d=dims[0];
+  const w=Number(Array.isArray(d)?d[0]:d&&d.width);
+  const h=Number(Array.isArray(d)?d[1]:d&&d.height);
+
   if(!(w>0&&h>0))return false;
-  ancho=1;alto=h/w;dimensionesReales=true;actualizar();return true;
+
+  ancho=1;
+  alto=h/w;
+  dimensionesReales=true;
+  actualizar();
+  return true;
  }
- target.appendChild(plano);target.appendChild(diagnostico);
- escena.appendChild(assets);escena.appendChild(camara);escena.appendChild(target);document.body.appendChild(escena);
- actualizar();video.addEventListener('loadedmetadata',ajustarTextura);plano.addEventListener('object3dset',ajustarTextura);
- escena.addEventListener('arReady',()=>{leerDimensiones();mensaje('Apunta al cuadro. '+(dimensionesReales?'Dimensiones detectadas.':'Medidas provisionales.'));});
- escena.addEventListener('arError',e=>{console.error(e);mensaje('Error al iniciar cámara.');});
+
+ target.appendChild(plano);
+ target.appendChild(diagnostico);
+
+ escena.appendChild(assets);
+ escena.appendChild(camara);
+ escena.appendChild(target);
+ document.body.appendChild(escena);
+
+ actualizar();
+
+ video.addEventListener('loadedmetadata',ajustarTextura);
+ plano.addEventListener('object3dset',ajustarTextura);
+
+ escena.addEventListener('arReady',()=>{
+  leerDimensiones();
+  mensaje('Apunta al cuadro. '+
+   (dimensionesReales?'Dimensiones detectadas.':'Medidas provisionales.'));
+ });
+
+ escena.addEventListener('arError',e=>{
+  console.error(e);
+  mensaje('Error al iniciar cámara.');
+ });
+
  target.addEventListener('targetFound',async()=>{
-  visible=true;if(!dimensionesReales)leerDimensiones();
-  mensaje((dimensionesReales?'Dimensiones detectadas. ':'Medidas provisionales. ')+'Inclina lentamente el celular y compara las esquinas.');
-  ajustarTextura();if(mostrarVideo){try{await video.play()}catch(e){console.warn(e);mensaje('Reconocido. Toca Activar sonido para iniciar video.');}}
+  visible=true;
+
+  if(!dimensionesReales)leerDimensiones();
+
+  mensaje(
+   (dimensionesReales?'Dimensiones detectadas. ':'Medidas provisionales. ')+
+   'Inclina lentamente el celular y compara las esquinas.'
+  );
+
+  ajustarTextura();
+
+  if(mostrarVideo){
+   try{
+    await video.play();
+   }catch(e){
+    console.warn(e);
+    mensaje('Reconocido. Toca Activar sonido para iniciar video.');
+   }
+  }
  });
- target.addEventListener('targetLost',()=>{visible=false;video.pause();mensaje('Apunta hacia la fotografía.');});
- video.addEventListener('error',()=>mensaje('No se pudo cargar el video.'));
+
+ target.addEventListener('targetLost',()=>{
+  visible=false;
+  video.pause();
+  mensaje('Apunta hacia la fotografía.');
+ });
+
+ video.addEventListener('error',()=>{
+  mensaje('No se pudo cargar el video.');
+ });
+
  document.getElementById('sonido').addEventListener('click',async e=>{
-  video.muted=!video.muted;video.volume=1;e.currentTarget.textContent=video.muted?'🔇 Activar sonido':'🔊 Sonido activado';
-  if(visible&&mostrarVideo)try{await video.play()}catch(err){console.warn(err)}
+  video.muted=!video.muted;
+  video.volume=1;
+  e.currentTarget.textContent=video.muted?
+   '🔇 Activar sonido':'🔊 Sonido activado';
+
+  if(visible&&mostrarVideo){
+   try{
+    await video.play();
+   }catch(err){
+    console.warn(err);
+   }
+  }
  });
+
  document.getElementById('marco').addEventListener('click',e=>{
-  mostrarMarco=!mostrarMarco;diagnostico.setAttribute('visible',mostrarMarco);
-  e.currentTarget.textContent=mostrarMarco?'🟩 Ocultar marco':'🟩 Mostrar marco';
+  mostrarMarco=!mostrarMarco;
+  diagnostico.setAttribute('visible',mostrarMarco);
+  e.currentTarget.textContent=mostrarMarco?
+   '🟩 Ocultar marco':'🟩 Mostrar marco';
  });
+
  document.getElementById('modo').addEventListener('click',async e=>{
-  mostrarVideo=!mostrarVideo;plano.setAttribute('visible',mostrarVideo);
-  e.currentTarget.textContent=mostrarVideo?'🎬 Mostrar solo marco':'🎬 Mostrar video';
-  if(!mostrarVideo)video.pause();else if(visible)try{await video.play()}catch(err){console.warn(err)}
+  mostrarVideo=!mostrarVideo;
+  plano.setAttribute('visible',mostrarVideo);
+  e.currentTarget.textContent=mostrarVideo?
+   '🎬 Mostrar solo marco':'🎬 Mostrar video';
+
+  if(!mostrarVideo){
+   video.pause();
+  }else if(visible){
+   try{
+    await video.play();
+   }catch(err){
+    console.warn(err);
+   }
+  }
  });
 })();
 </script>
