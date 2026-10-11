@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AluARTmx AR · Diagnóstico v4.1</title>
+<style>:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#0b1424;color:#f7f9fc;font:16px system-ui,Segoe UI,sans-serif}main{max-width:760px;margin:25px auto;padding:0 16px}h1{font-size:26px}h2{font-size:21px}.panel{background:#18263b;border:1px solid #344762;border-radius:15px;padding:22px;margin:16px 0}label{display:block;margin:14px 0 5px}input{width:100%;padding:12px;border-radius:9px;background:#0b1729;color:#fff;border:1px solid #52647d;font:inherit}button{border:0;border-radius:8px;padding:12px 16px;margin:12px 7px 0 0;background:#28b7aa;color:#041a1a;font-weight:700;cursor:pointer}button.secondary{background:#52657f;color:white}button:disabled{opacity:.5;cursor:wait}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#0a1525;border-radius:9px;padding:16px;font-size:13px;line-height:1.7}small{color:#bbcadc}strong{color:#b5f4df}</style>
+</head><body><main><h1>🔐 AluARTmx AR · Diagnóstico v4.1</h1><p>Comprobación de lectura con sesiones reales de Supabase Auth. No crea, edita ni elimina datos.</p>
+<section class="panel"><h2>1. Iniciar sesión</h2><form id="login"><label for="email">Correo de Supabase Auth</label><input id="email" type="email" autocomplete="username" required><label for="password">Contraseña</label><input id="password" type="password" autocomplete="current-password" required><button id="submit" type="submit">Iniciar sesión y comprobar</button><button id="logout" class="secondary" type="button">Cerrar sesión</button></form><p><small>Usa una de las dos cuentas de prueba. No compartas tu contraseña ni captures la pantalla mientras esté visible. No se guarda la contraseña en el navegador.</small></p></section>
+<section class="panel"><h2>2. Resultado</h2><pre id="out" aria-live="polite">Esperando inicio de sesión…</pre><small>Esta prueba verifica únicamente consultas SELECT con RLS. No comprueba permisos de escritura, Storage ni R2.</small></section>
+</main><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script>
+'use strict';
+const SUPABASE_URL='https://fqqtztgqlijlxyesbaqz.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY='sb_publishable_ehoCG0dQDrMlAG6j7UpyZA_gLiChk-9';
+const DEMO_SLUG='empresa-demo-aluartmx';
+const OTHER_SLUG='fotografia-demo-b';
+const out=document.getElementById('out');
+const submit=document.getElementById('submit');
+const say=(s)=>out.textContent=s;
+const client=window.supabase?.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
+function explain(error){return error?.message||'Error desconocido';}
+async function check(){
+  if(!client){say('No se pudo cargar Supabase JS. Revisa la conexión.');return;}
+  const {data:{user},error:userError}=await client.auth.getUser();
+  if(userError||!user){say('No hay sesión autenticada.');return;}
+  const profile=await client.from('usuarios').select('rol,empresa_id').eq('id',user.id).maybeSingle();
+  if(profile.error){say('Error consultando perfil: '+explain(profile.error));return;}
+  if(!profile.data){say('La cuenta está autenticada pero no tiene perfil en public.usuarios.');return;}
+  const [companies,frames]=await Promise.all([
+    client.from('empresas').select('id,nombre,slug,plan').order('nombre').limit(1000),
+    client.from('cuadros').select('id,nombre,empresa_id').order('nombre').limit(1000)
+  ]);
+  if(companies.error||frames.error){say('Error de lectura RLS:\nEmpresas: '+(companies.error?explain(companies.error):'OK')+'\nCuadros: '+(frames.error?explain(frames.error):'OK'));return;}
+  const rol=profile.data.rol;
+  const list=companies.data||[], cuadros=frames.data||[];
+  const lines=['Sesión autenticada: SÍ','Rol: '+rol,'Empresas visibles: '+list.length];
+  for(const e of list)lines.push('  • '+e.nombre+' ('+e.slug+')');
+  lines.push('Cuadros visibles: '+cuadros.length);
+  for(const c of cuadros.slice(0,20))lines.push('  • '+c.nombre);
+  if(cuadros.length>20)lines.push('  (mostrando los primeros 20)');
+  if(rol==='cliente'){
+    const allowed=profile.data.empresa_id;
+    const noOtherCompanies=list.every(e=>e.id===allowed);
+    const noOtherFrames=cuadros.every(c=>c.empresa_id===allowed);
+    lines.push('',(noOtherCompanies?'✅':'❌')+' Empresas visibles pertenecen a la cuenta: '+(noOtherCompanies?'SÍ':'NO'));
+    lines.push((noOtherFrames?'✅':'❌')+' Cuadros visibles pertenecen a la cuenta: '+(noOtherFrames?'SÍ':'NO'));
+    lines.push(list.some(e=>e.slug===DEMO_SLUG)?'Empresa demo principal: visible':'Empresa demo principal: no visible');
+    lines.push(list.some(e=>e.slug===OTHER_SLUG)?'⚠️ Empresa Demo B visible':'Empresa Demo B: no visible');
+  }else if(rol==='superadmin'){
+    lines.push('','Comprobación superadmin (datos de prueba actuales):');
+    lines.push((list.some(e=>e.slug===DEMO_SLUG)?'✅':'⚠️')+' Empresa Demo AluARTmx visible');
+    lines.push((list.some(e=>e.slug===OTHER_SLUG)?'✅':'⚠️')+' Fotografia Demo B visible');
+    lines.push((cuadros.some(c=>c.nombre==='PRUEBA SEGURIDAD - '+DEMO_SLUG)?'✅':'⚠️')+' Cuadro de empresa demo visible');
+    lines.push((cuadros.some(c=>c.nombre==='PRUEBA SEGURIDAD - '+OTHER_SLUG)?'✅':'⚠️')+' Cuadro de fotografía demo visible');
+  }else{lines.push('⚠️ Rol no esperado para esta prueba.');}
+  lines.push('','Nota: resultados limitados a 1000 registros por consulta; esta prueba no verifica permisos de escritura ni de archivos.');
+  say(lines.join('\n'));
+}
+document.getElementById('login').addEventListener('submit',async(ev)=>{
+  ev.preventDefault();if(!client)return;
+  submit.disabled=true;say('Iniciando sesión y consultando datos…');
+  const email=document.getElementById('email').value.trim();
+  const password=document.getElementById('password').value;
+  try{
+    await client.auth.signOut();
+    const {error}=await client.auth.signInWithPassword({email,password});
+    document.getElementById('password').value='';
+    if(error){say('No se pudo iniciar sesión: '+explain(error));return;}
+    await check();
+  }catch(err){say('Error: '+explain(err));}finally{submit.disabled=false;}
+});
+document.getElementById('logout').addEventListener('click',async()=>{
+  if(client)await client.auth.signOut();document.getElementById('password').value='';say('Sesión cerrada.');
+});
+</script></body></html>
