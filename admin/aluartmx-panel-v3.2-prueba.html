@@ -1,0 +1,1359 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AluARTmx · Panel AR v3.2 (prueba)</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="./mindar-compiler.js"></script>
+
+<style>
+* {
+  box-sizing: border-box;
+}
+
+[hidden] { display: none !important; }
+
+body {
+  margin: 0;
+  background: #111;
+  color: white;
+  font-family: Arial, sans-serif;
+}
+
+header {
+  background: black;
+  padding: 24px 18px;
+  text-align: center;
+  border-bottom: 1px solid #333;
+}
+
+header h1 {
+  margin: 0;
+  font-size: 30px;
+}
+
+header p {
+  margin: 8px 0 0;
+  color: #aaa;
+  font-size: 14px;
+}
+
+.contenedor {
+  max-width: 900px;
+  margin: auto;
+  padding: 24px 16px 60px;
+}
+
+.card {
+  background: #1d1d1d;
+  border: 1px solid #333;
+  border-radius: 16px;
+  padding: 22px;
+  margin-bottom: 20px;
+}
+
+.card h2 {
+  margin-top: 0;
+}
+
+label {
+  display: block;
+  margin: 18px 0 8px;
+  font-weight: bold;
+}
+
+input[type="text"],
+input[type="file"] {
+  width: 100%;
+  padding: 13px;
+  border-radius: 9px;
+  border: 1px solid #555;
+  background: #111;
+  color: white;
+  font-size: 15px;
+}
+
+input[type="file"] {
+  padding: 10px;
+}
+
+small {
+  display: block;
+  margin-top: 7px;
+  color: #aaa;
+  line-height: 1.5;
+}
+
+.orientaciones {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.orientacion {
+  border: 2px solid #444;
+  border-radius: 13px;
+  background: #151515;
+  color: white;
+  padding: 17px 10px;
+  cursor: pointer;
+  text-align: center;
+}
+
+.orientacion.activa {
+  border-color: white;
+  background: #333;
+}
+
+.iconoCuadro {
+  display: block;
+  border: 2px solid #ddd;
+  border-radius: 3px;
+  margin: 0 auto 12px;
+  background: #303030;
+}
+
+.iconoCuadro.vertical {
+  width: 46px;
+  height: 69px;
+}
+
+.iconoCuadro.horizontal {
+  width: 69px;
+  height: 46px;
+  margin-top: 23px;
+}
+
+.orientacion strong,
+.orientacion span {
+  display: block;
+}
+
+.orientacion span {
+  color: #bbb;
+  font-size: 12px;
+  margin-top: 6px;
+}
+
+.ayuda {
+  padding: 12px;
+  background: #111;
+  border-radius: 9px;
+  margin-top: 12px;
+  color: #bbb;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+button {
+  border: 0;
+  border-radius: 10px;
+  padding: 14px 18px;
+  font-size: 15px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.btnCrear {
+  width: 100%;
+  margin-top: 24px;
+  background: white;
+  color: #111;
+}
+
+.btnCrear:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+.estado {
+  margin-top: 18px;
+  padding: 15px;
+  background: black;
+  border-radius: 10px;
+  white-space: pre-wrap;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.proyecto {
+  background: #151515;
+  border: 1px solid #333;
+  border-radius: 14px;
+  padding: 18px;
+  margin-top: 15px;
+}
+
+.proyecto h3 {
+  margin-top: 0;
+}
+
+.info {
+  color: #aaa;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+}
+
+.botones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.btn {
+  background: white;
+  color: #111;
+}
+
+.btnSec {
+  background: #333;
+  color: white;
+}
+
+.btnDanger {
+  background: #8b0000;
+  color: white;
+}
+
+.qr {
+  margin-top: 18px;
+  background: white;
+  padding: 15px;
+  display: inline-block;
+  border-radius: 10px;
+}
+
+#sinProyectos {
+  color: #888;
+  text-align: center;
+  padding: 20px;
+}
+
+@media(max-width:450px) {
+  .card {
+    padding: 16px;
+  }
+
+  button {
+    font-size: 13px;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <h1>AluARTmx</h1>
+  <p>Panel de experiencias de realidad aumentada · v3.2 (prueba)</p>
+</header>
+
+<div class="contenedor" id="loginPanel">
+  <div class="card">
+    <h2>🔐 Acceso administrativo</h2>
+    <label for="loginUsuario">Usuario</label>
+    <input type="text" id="loginUsuario" autocomplete="username" value="scout6">
+    <label for="loginClave">Contraseña</label>
+    <input type="password" id="loginClave" autocomplete="current-password" style="width:100%;padding:13px;border-radius:9px;border:1px solid #555;background:#111;color:white">
+    <button class="btnCrear" id="loginBoton" type="button">Entrar a AluARTmx</button>
+    <div class="estado" id="loginEstado" role="status">Ingresa tus credenciales.</div>
+  </div>
+</div>
+<div class="contenedor" id="adminPanel" hidden>
+  <div style="text-align:right;margin-bottom:15px"><button type="button" id="cerrarSesion" class="btnSec">Cerrar sesión</button></div>
+
+  <div class="card">
+
+    <h2>➕ Crear nuevo cuadro</h2>
+
+    <label for="id">ID único del cuadro</label>
+    <input type="text" id="id" readonly>
+
+    <small>
+      El ID se genera automáticamente para evitar
+      conflictos con cuadros anteriores.
+    </small>
+
+    <label for="nombre">Nombre / cliente</label>
+    <input
+      type="text"
+      id="nombre"
+      placeholder="Ej. Juan Pérez"
+    >
+
+    <label>Orientación del cuadro</label>
+
+    <div class="orientaciones">
+
+      <button
+        type="button"
+        id="btnVertical"
+        class="orientacion activa"
+        aria-pressed="true"
+      >
+        <div class="iconoCuadro vertical"></div>
+        <strong>Vertical</strong>
+        <span>Ej. 20 × 30 cm</span>
+      </button>
+
+      <button
+        type="button"
+        id="btnHorizontal"
+        class="orientacion"
+        aria-pressed="false"
+      >
+        <div class="iconoCuadro horizontal"></div>
+        <strong>Horizontal</strong>
+        <span>Ej. 30 × 20 cm</span>
+      </button>
+
+    </div>
+
+    <div class="ayuda" id="ayudaOrientacion">
+      Cuadro vertical: proporción 2:3.
+    </div>
+
+    <label for="archivoFoto">
+      📷 Fotografía del cuadro (JPG o PNG)
+    </label>
+
+    <input
+      type="file"
+      id="archivoFoto"
+      accept="image/jpeg,image/png,.jpg,.jpeg,.png"
+    >
+
+    <small>
+      Selecciona la fotografía que imprimirás
+      en aluminio. El panel generará automáticamente
+      el archivo .mind.
+    </small>
+
+    <label for="archivoVideo" id="labelVideo">
+      🎬 Agregar video vertical
+    </label>
+
+    <input
+      type="file"
+      id="archivoVideo"
+      accept="video/mp4,.mp4"
+    >
+
+    <small id="ayudaVideo">
+      Recomendado: video vertical. Máximo 49 MiB, formato MP4.
+    </small>
+
+    <div class="ayuda" id="datosVideo">
+      Aún no has seleccionado un video.
+    </div>
+
+    <button
+      type="button"
+      id="crear"
+      class="btnCrear"
+    >
+      🚀 SUBIR ARCHIVOS Y CREAR CUADRO
+    </button>
+
+    <div id="estado" class="estado">
+      Esperando archivos...
+    </div>
+
+  </div>
+
+  <div class="card">
+    <h2>📦 Mis cuadros</h2>
+    <label for="buscarCuadro">Buscar por cliente o ID</label>
+    <input type="text" id="buscarCuadro" placeholder="Escribe nombre o ID del cuadro">
+    <small>Los cuadros existentes se mantienen en este navegador.</small>
+    <div id="lista"></div>
+  </div>
+
+</div>
+
+<script>
+
+// =====================================
+// SUPABASE
+// =====================================
+
+const SUPABASE_URL =
+  'https://fqqtztgqlijlxyesbaqz.supabase.co';
+
+const SUPABASE_KEY =
+  'sb_publishable_ehoCG0dQDrMlAG6j7UpyZA_gLiChk-9';
+
+const supabaseClient = supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_KEY
+);
+
+const STORAGE_BUCKET = 'AluART';
+const API_BASE = 'https://aluartmx-api.jinscout6.workers.dev';
+let sessionToken = null;
+let sessionExpiresAt = 0;
+
+// =====================================
+// CONFIGURACIÓN
+// =====================================
+
+const AR_BASE =
+  'https://tecnofilo6.github.io/AluART/admin/ar.html';
+
+const STORAGE_KEY = 'aluartmx_projects_v3';
+
+// =====================================
+// ELEMENTOS
+// =====================================
+
+const inputId =
+  document.getElementById('id');
+
+const inputNombre =
+  document.getElementById('nombre');
+
+const inputFoto =
+  document.getElementById('archivoFoto');
+
+const inputVideo =
+  document.getElementById('archivoVideo');
+
+const botonCrear =
+  document.getElementById('crear');
+
+const estado =
+  document.getElementById('estado');
+
+const lista =
+  document.getElementById('lista');
+
+const btnVertical =
+  document.getElementById('btnVertical');
+
+const btnHorizontal =
+  document.getElementById('btnHorizontal');
+
+const ayudaOrientacion =
+  document.getElementById('ayudaOrientacion');
+
+const labelVideo =
+  document.getElementById('labelVideo');
+
+const ayudaVideo =
+  document.getElementById('ayudaVideo');
+
+const datosVideo =
+  document.getElementById('datosVideo');
+
+let orientacionSeleccionada = 'vertical';
+let dimensionesVideo = null;
+
+// =====================================
+// ORIENTACIÓN
+// =====================================
+
+function seleccionarOrientacion(valor) {
+
+  orientacionSeleccionada = valor;
+
+  const esVertical = valor === 'vertical';
+
+  btnVertical.classList.toggle(
+    'activa',
+    esVertical
+  );
+
+  btnHorizontal.classList.toggle(
+    'activa',
+    !esVertical
+  );
+
+  btnVertical.setAttribute(
+    'aria-pressed',
+    String(esVertical)
+  );
+
+  btnHorizontal.setAttribute(
+    'aria-pressed',
+    String(!esVertical)
+  );
+
+  labelVideo.textContent = esVertical
+    ? '🎬 Agregar video vertical'
+    : '🎬 Agregar video horizontal';
+
+  ayudaVideo.textContent = esVertical
+    ? 'Recomendado: video vertical. Máximo 49 MiB, formato MP4.'
+    : 'Recomendado: video horizontal. Máximo 49 MiB, formato MP4.';
+
+  ayudaOrientacion.textContent = esVertical
+    ? 'Cuadro vertical: proporción 2:3.'
+    : 'Cuadro horizontal: proporción 3:2.';
+
+  mostrarDatosVideo();
+}
+
+btnVertical.addEventListener(
+  'click',
+  function() {
+    seleccionarOrientacion('vertical');
+  }
+);
+
+btnHorizontal.addEventListener(
+  'click',
+  function() {
+    seleccionarOrientacion('horizontal');
+  }
+);
+
+// =====================================
+// DIMENSIONES DEL VIDEO
+// =====================================
+
+function leerDimensionesVideo(archivo) {
+
+  return new Promise(function(resolve, reject) {
+
+    const url = URL.createObjectURL(archivo);
+    const video = document.createElement('video');
+
+    video.preload = 'metadata';
+    video.muted = true;
+    video.playsInline = true;
+
+    function limpiar() {
+      video.removeAttribute('src');
+      video.load();
+      URL.revokeObjectURL(url);
+    }
+
+    video.onloadedmetadata = function() {
+
+      const resultado = {
+        ancho: video.videoWidth,
+        alto: video.videoHeight,
+        duracion: video.duration
+      };
+
+      limpiar();
+      resolve(resultado);
+    };
+
+    video.onerror = function() {
+      limpiar();
+      reject(
+        new Error(
+          'No se pudieron leer las dimensiones del video.'
+        )
+      );
+    };
+
+    video.src = url;
+  });
+}
+
+function mostrarDatosVideo() {
+
+  if (!dimensionesVideo) {
+    datosVideo.textContent =
+      'Aún no has seleccionado un video.';
+    return;
+  }
+
+  const ancho = dimensionesVideo.ancho;
+  const alto = dimensionesVideo.alto;
+
+  const tipo = alto > ancho
+    ? 'vertical'
+    : ancho > alto
+      ? 'horizontal'
+      : 'cuadrado';
+
+  let mensaje =
+    'Video detectado: ' +
+    ancho + ' × ' + alto +
+    ' píxeles (' + tipo + ').';
+
+  if (
+    tipo !== orientacionSeleccionada &&
+    tipo !== 'cuadrado'
+  ) {
+    mensaje +=
+      '\n\n⚠️ El video tiene otra orientación. ' +
+      'El reproductor intentará recortarlo ' +
+      'para cubrir el cuadro.';
+  } else {
+    mensaje +=
+      '\n\n✅ Orientación compatible con el cuadro.';
+  }
+
+  datosVideo.textContent = mensaje;
+}
+
+inputVideo.addEventListener(
+  'change',
+  async function() {
+
+    dimensionesVideo = null;
+
+    const archivo = inputVideo.files[0];
+
+    if (!archivo) {
+      mostrarDatosVideo();
+      return;
+    }
+
+    datosVideo.textContent =
+      'Analizando dimensiones del video...';
+
+    try {
+      dimensionesVideo =
+        await leerDimensionesVideo(archivo);
+
+      mostrarDatosVideo();
+
+    } catch (error) {
+      datosVideo.textContent =
+        '⚠️ ' + error.message;
+    }
+  }
+);
+
+// =====================================
+// PROYECTOS LOCALES
+// =====================================
+
+function obtenerProyectos() {
+
+  try {
+    const datos = JSON.parse(
+      localStorage.getItem(STORAGE_KEY)
+    );
+
+    return Array.isArray(datos) ? datos : [];
+
+  } catch (error) {
+    return [];
+  }
+}
+
+function guardarProyectos(proyectos) {
+
+  localStorage.setItem(
+    STORAGE_KEY,
+    JSON.stringify(proyectos)
+  );
+}
+
+// =====================================
+// GENERAR ID ÚNICO
+// =====================================
+
+function generarSiguienteId() {
+
+  // Cada cuadro recibe un identificador
+  // nuevo, incluso si se borraron pruebas.
+
+  if (
+    window.crypto &&
+    typeof window.crypto.randomUUID === 'function'
+  ) {
+    return window.crypto.randomUUID();
+  }
+
+  // Alternativa para navegadores antiguos.
+  const bytes = new Uint8Array(16);
+  window.crypto.getRandomValues(bytes);
+
+  bytes[6] = (bytes[6] & 15) | 64;
+  bytes[8] = (bytes[8] & 63) | 128;
+
+  const hex = Array.from(
+    bytes,
+    b => b.toString(16).padStart(2, '0')
+  );
+
+  return [
+    hex.slice(0, 4).join(''),
+    hex.slice(4, 6).join(''),
+    hex.slice(6, 8).join(''),
+    hex.slice(8, 10).join(''),
+    hex.slice(10, 16).join('')
+  ].join('-');
+}
+
+function prepararNuevoId() {
+  inputId.value = generarSiguienteId();
+}
+
+prepararNuevoId();
+
+// =====================================
+// ESTADO
+// =====================================
+
+function mostrarEstado(texto) {
+  estado.textContent = texto;
+}
+
+// =====================================
+// COMPILADOR MINDAR LOCAL
+// =====================================
+
+async function compilarFotoAMind(archivo) {
+
+  const biblioteca = window.AluARTMindCompiler;
+
+  if (
+    !biblioteca ||
+    typeof biblioteca.Compiler !== 'function'
+  ) {
+    throw new Error(
+      'No se encontró el compilador local de MindAR.\n' +
+      'Comprueba que admin/mindar-compiler.js ' +
+      'esté publicado en GitHub Pages.'
+    );
+  }
+
+  const urlTemporal =
+    URL.createObjectURL(archivo);
+
+  const imagen = new Image();
+
+  try {
+
+    mostrarEstado(
+      '📷 Abriendo fotografía...\n' +
+      archivo.name
+    );
+
+    await new Promise(function(resolve, reject) {
+
+      imagen.onload = function() {
+        resolve();
+      };
+
+      imagen.onerror = function() {
+        reject(
+          new Error(
+            'No se pudo leer la fotografía.'
+          )
+        );
+      };
+
+      imagen.src = urlTemporal;
+    });
+
+    if (
+      imagen.naturalWidth < 100 ||
+      imagen.naturalHeight < 100
+    ) {
+      throw new Error(
+        'La fotografía es demasiado pequeña.'
+      );
+    }
+
+    mostrarEstado(
+      '🧠 Iniciando compilador MindAR...\n' +
+      'Esto puede tardar algunos segundos.'
+    );
+
+    const compilador =
+      new biblioteca.Compiler();
+
+    await compilador.compileImageTargets(
+      [imagen],
+      function(progreso) {
+
+        const numero = Number(progreso);
+
+        const porcentaje = Number.isFinite(numero)
+          ? Math.max(
+              0,
+              Math.min(
+                100,
+                Math.round(
+                  numero <= 1
+                    ? numero * 100
+                    : numero
+                )
+              )
+            )
+          : 0;
+
+        mostrarEstado(
+          '🧠 CONVIRTIENDO FOTO A .MIND\n\n' +
+          'Progreso: ' + porcentaje + '%\n\n' +
+          'No cierres esta página.'
+        );
+      }
+    );
+
+    mostrarEstado(
+      '📦 Exportando archivo .mind...'
+    );
+
+    const buffer =
+      await compilador.exportData();
+
+    const archivoMind = new Blob(
+      [buffer],
+      {
+        type: 'application/octet-stream'
+      }
+    );
+
+    if (archivoMind.size === 0) {
+      throw new Error(
+        'El compilador generó un archivo vacío.'
+      );
+    }
+
+    mostrarEstado(
+      '✅ ARCHIVO .MIND GENERADO\n\n' +
+      'Tamaño: ' +
+      Math.round(archivoMind.size / 1024) +
+      ' KB\n\nPreparando subida...'
+    );
+
+    return archivoMind;
+
+  } finally {
+    URL.revokeObjectURL(urlTemporal);
+  }
+}
+
+// =====================================
+// SUBIR ARCHIVO A SUPABASE
+// =====================================
+
+async function subirArchivo(archivo, ruta) {
+
+  const resultado = await supabaseClient
+    .storage
+    .from(STORAGE_BUCKET)
+    .upload(
+      ruta,
+      archivo,
+      {
+        cacheControl: '3600',
+        upsert: false
+      }
+    );
+
+  if (resultado.error) {
+    throw new Error(
+      'No se pudo subir ' + ruta + ':\n' +
+      resultado.error.message
+    );
+  }
+
+  const publicData = supabaseClient
+    .storage
+    .from(STORAGE_BUCKET)
+    .getPublicUrl(ruta);
+
+  return publicData.data.publicUrl;
+}
+
+// =====================================
+// EXTENSIÓN VIDEO
+// =====================================
+
+function obtenerExtensionVideo(nombre) {
+
+  const partes = nombre.split('.');
+
+  if (partes.length < 2) {
+    return 'mp4';
+  }
+
+  return partes
+    .pop()
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '') || 'mp4';
+}
+
+// =====================================
+// GENERAR QR
+// =====================================
+
+function crearQR(contenedor, url) {
+
+  contenedor.innerHTML = '';
+
+  new QRCode(contenedor, {
+    text: url,
+    width: 220,
+    height: 220,
+    correctLevel: QRCode.CorrectLevel.M
+  });
+}
+
+// =====================================
+// CREAR CUADRO
+// =====================================
+
+botonCrear.addEventListener(
+  'click',
+  async function() {
+
+    const id = inputId.value.trim();
+    const nombre = inputNombre.value.trim();
+
+    const archivoFoto =
+      inputFoto.files[0];
+
+    const archivoVideo =
+      inputVideo.files[0];
+
+    if (!nombre) {
+      alert('Escribe el nombre o cliente.');
+      return;
+    }
+
+    if (!archivoFoto) {
+      alert('Selecciona una fotografía JPG o PNG.');
+      return;
+    }
+
+    if (!archivoVideo) {
+      alert('Selecciona el video.');
+      return;
+    }
+
+    if (!['image/jpeg', 'image/png'].includes(archivoFoto.type)) {
+      alert('La fotografía debe ser JPG o PNG.');
+      return;
+    }
+    if (archivoVideo.type !== 'video/mp4' ||
+        !archivoVideo.name.toLowerCase().endsWith('.mp4')) {
+      alert('Selecciona un video MP4.');
+      return;
+    }
+    if (!sessionToken || Date.now() >= sessionExpiresAt) {
+      cerrarAcceso();
+      alert('Tu sesión expiró. Inicia sesión de nuevo.');
+      return;
+    }
+
+    const limite = 49 * 1024 * 1024;
+
+    if (archivoVideo.size > limite) {
+      alert('El video supera los 49 MiB.');
+      return;
+    }
+
+    const proyectosActuales =
+      obtenerProyectos();
+
+    if (
+      proyectosActuales.some(
+        function(p) {
+          return p.id === id;
+        }
+      )
+    ) {
+      alert('Este ID ya existe en el panel.');
+      return;
+    }
+
+    botonCrear.disabled = true;
+
+    try {
+
+      let targetParaSubir;
+
+      {
+
+        mostrarEstado(
+          '📷 Preparando fotografía para MindAR...'
+        );
+
+        targetParaSubir =
+          await compilarFotoAMind(archivoFoto);
+      }
+
+      mostrarEstado(
+        '☁️ Subiendo archivo .mind a Supabase...'
+      );
+
+      const rutaMind =
+        'targets/' + id + '.mind';
+
+      const mindUrl = await subirArchivo(
+        targetParaSubir,
+        rutaMind
+      );
+
+      mostrarEstado('🎬 Subiendo video a Cloudflare R2...\n\n' + archivoVideo.name);
+      const videoSubido = await subirVideoR2(archivoVideo);
+      const videoUrl = videoSubido.url;
+      const rutaVideo = videoSubido.key;
+
+      const arUrl =
+        AR_BASE +
+        '?id=' + encodeURIComponent(id) +
+        '&target=' + encodeURIComponent(mindUrl) +
+        '&video=' + encodeURIComponent(videoUrl) +
+        '&orientacion=' +
+        encodeURIComponent(orientacionSeleccionada);
+
+      const proyectos =
+        obtenerProyectos();
+
+      const proyecto = {
+        id: id,
+        name: nombre,
+        url: arUrl,
+        video: videoUrl,
+        target: mindUrl,
+        videoFile: rutaVideo,
+        targetFile: rutaMind,
+        orientacion: orientacionSeleccionada,
+        created: new Date().toISOString()
+      };
+
+      proyectos.push(proyecto);
+
+      guardarProyectos(proyectos);
+
+      inputNombre.value = '';
+      inputFoto.value = '';
+      inputVideo.value = '';
+
+      dimensionesVideo = null;
+
+      mostrarDatosVideo();
+
+      prepararNuevoId();
+
+      mostrarEstado(
+        '✅ CUADRO CREADO CORRECTAMENTE\n\n' +
+        'ID: ' + id + '\n' +
+        'Cliente: ' + nombre + '\n' +
+        'Orientación: ' +
+        orientacionSeleccionada + '\n\n' +
+        'Target .mind en Supabase y video en R2.\n' +
+        'Código QR generado.'
+      );
+
+      renderizarLista();
+
+      setTimeout(function() {
+
+        window.scrollTo({
+          top: document.body.scrollHeight,
+          behavior: 'smooth'
+        });
+
+      }, 300);
+
+    } catch (error) {
+
+      console.error(
+        'ERROR AL CREAR CUADRO:',
+        error
+      );
+
+      mostrarEstado(
+        '❌ ERROR AL CREAR EL CUADRO\n\n' +
+        error.message
+      );
+
+      alert(
+        'Error al crear el cuadro:\n\n' +
+        error.message
+      );
+
+    } finally {
+      botonCrear.disabled = false;
+    }
+  }
+);
+
+// =====================================
+// MOSTRAR PROYECTOS
+// =====================================
+
+function renderizarLista() {
+
+  const busqueda = document.getElementById('buscarCuadro').value.trim().toLocaleLowerCase();
+  const proyectos = obtenerProyectos().filter(p =>
+    String(p.name || '').toLocaleLowerCase().includes(busqueda) ||
+    String(p.id || '').toLocaleLowerCase().includes(busqueda)
+  );
+
+  lista.innerHTML = '';
+
+  if (proyectos.length === 0) {
+
+    lista.innerHTML =
+      '<div id="sinProyectos">' +
+      'No hay cuadros que coincidan con la búsqueda.' +
+      '</div>';
+
+    return;
+  }
+
+  proyectos
+    .slice()
+    .reverse()
+    .forEach(function(p) {
+
+      const div =
+        document.createElement('div');
+
+      div.className = 'proyecto';
+
+      const orientacion =
+        p.orientacion || 'No especificada';
+
+      div.innerHTML = `
+        <h3>🖼️ Cuadro ${escapeHTML(p.id)}</h3>
+
+        <div class="info">
+
+          <strong>Cliente:</strong>
+          ${escapeHTML(p.name)}
+
+          <br><br>
+
+          <strong>Orientación:</strong>
+          ${escapeHTML(orientacion)}
+
+          <br><br>
+
+          <strong>Target:</strong><br>
+          ${escapeHTML(p.target)}
+
+          <br><br>
+
+          <strong>Video:</strong><br>
+          ${escapeHTML(p.video)}
+
+        </div>
+
+        <div class="qr"></div>
+
+        <div class="botones">
+
+          <button class="btn probarAR">
+            📱 Probar AR
+          </button>
+
+          <button class="btn verVideo">
+            🎬 Ver video
+          </button>
+
+          <button class="btnSec copiarURL">
+            🔗 Copiar URL
+          </button>
+
+          <button class="btnDanger eliminar">
+            🗑️ Eliminar
+          </button>
+
+        </div>
+      `;
+
+      lista.appendChild(div);
+
+      const qrContenedor =
+        div.querySelector('.qr');
+
+      crearQR(
+        qrContenedor,
+        p.url
+      );
+
+      div.querySelector('.probarAR')
+        .addEventListener(
+          'click',
+          function() {
+            window.open(p.url, '_blank');
+          }
+        );
+
+      div.querySelector('.verVideo')
+        .addEventListener(
+          'click',
+          function() {
+            window.open(p.video, '_blank');
+          }
+        );
+
+      div.querySelector('.copiarURL')
+        .addEventListener(
+          'click',
+          function() {
+            copiarURL(p.url);
+          }
+        );
+
+      div.querySelector('.eliminar')
+        .addEventListener(
+          'click',
+          function() {
+            eliminarProyecto(p.id);
+          }
+        );
+    });
+}
+
+// =====================================
+// SEGURIDAD HTML
+// =====================================
+
+function escapeHTML(texto) {
+
+  return String(texto)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+// =====================================
+// COPIAR URL
+// =====================================
+
+async function copiarURL(url) {
+
+  try {
+
+    await navigator.clipboard.writeText(url);
+
+    alert('URL copiada.');
+
+  } catch (error) {
+
+    prompt('Copia esta URL:', url);
+  }
+}
+
+// =====================================
+// ELIMINAR PROYECTO DEL PANEL
+// =====================================
+
+function eliminarProyecto(id) {
+
+  const confirmar = confirm(
+    '¿Eliminar este cuadro del panel?\n\n' +
+    'Los archivos almacenados no se borrarán.'
+  );
+
+  if (!confirmar) {
+    return;
+  }
+
+  const proyectos =
+    obtenerProyectos();
+
+  const nuevos =
+    proyectos.filter(
+      function(p) {
+        return p.id !== id;
+      }
+    );
+
+  guardarProyectos(nuevos);
+
+  renderizarLista();
+
+  prepararNuevoId();
+}
+
+// =====================================
+// ACCESO ADMINISTRATIVO / CLOUDFLARE R2
+// =====================================
+function cerrarAcceso() {
+  sessionToken = null;
+  sessionExpiresAt = 0;
+  document.getElementById('adminPanel').hidden = true;
+  document.getElementById('loginPanel').hidden = false;
+  document.getElementById('loginClave').value = '';
+  document.getElementById('loginEstado').textContent = 'Ingresa tus credenciales.';
+}
+
+document.getElementById('cerrarSesion').addEventListener('click', cerrarAcceso);
+document.getElementById('buscarCuadro').addEventListener('input', renderizarLista);
+document.getElementById('loginClave').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('loginBoton').click();
+});
+
+document.getElementById('loginBoton').addEventListener('click', async () => {
+  const boton = document.getElementById('loginBoton');
+  const mensaje = document.getElementById('loginEstado');
+  const username = document.getElementById('loginUsuario').value.trim();
+  const password = document.getElementById('loginClave').value;
+  if (!username || !password) {
+    mensaje.textContent = 'Escribe usuario y contraseña.';
+    return;
+  }
+  boton.disabled = true;
+  mensaje.textContent = 'Verificando acceso...';
+  try {
+    const res = await fetch(API_BASE + '/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+      cache: 'no-store'
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success || !data.token) {
+      throw new Error(res.status === 401 ? 'Usuario o contraseña incorrectos.' : (data.error || 'No se pudo iniciar sesión.'));
+    }
+    sessionToken = data.token; // Solo en memoria; no se guarda en localStorage.
+    sessionExpiresAt = Date.now() + Math.max(0, Number(data.expires_in) - 30) * 1000;
+    document.getElementById('loginClave').value = '';
+    document.getElementById('loginPanel').hidden = true;
+    document.getElementById('adminPanel').hidden = false;
+    renderizarLista();
+  } catch (error) {
+    mensaje.textContent = '❌ ' + error.message;
+  } finally {
+    boton.disabled = false;
+  }
+});
+
+async function subirVideoR2(archivo) {
+  if (!sessionToken || Date.now() >= sessionExpiresAt) {
+    cerrarAcceso();
+    throw new Error('La sesión expiró. Inicia sesión nuevamente.');
+  }
+  const res = await fetch(API_BASE + '/upload', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer ' + sessionToken,
+      'Content-Type': 'video/mp4'
+    },
+    body: archivo
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.success || !data.url || !data.key) {
+    if (res.status === 401) cerrarAcceso();
+    throw new Error('No se pudo subir el video a R2: ' + (data.error || 'HTTP ' + res.status));
+  }
+  return data;
+}
+
+// =====================================
+// INICIO
+// =====================================
+
+seleccionarOrientacion('vertical');
+renderizarLista();
+
+</script>
+</body>
+</html>
