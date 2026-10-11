@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AluARTmx AR · Diagnóstico de acceso</title>
+<style>
+:root{font-family:system-ui,-apple-system,Segoe UI,sans-serif;color-scheme:dark}body{margin:0;background:#0d1522;color:#f4f7fc;padding:24px}main{max-width:700px;margin:32px auto}section{background:#172437;border:1px solid #33455c;border-radius:14px;padding:22px;margin:16px 0}h1{font-size:1.7rem}label{display:block;margin:14px 0 6px}input,button{font:inherit;box-sizing:border-box}input{width:100%;padding:12px;border-radius:8px;border:1px solid #60738b;background:#0c1725;color:white}button{border:0;border-radius:8px;padding:12px 18px;background:#27b7a4;color:#051816;font-weight:700;cursor:pointer;margin:14px 8px 0 0}button:disabled{opacity:.5;cursor:wait}button.secondary{background:#53667c;color:white}pre{white-space:pre-wrap;word-break:break-word;background:#0c1725;padding:16px;border-radius:8px;line-height:1.5}small{color:#bdc9d8}.ok{color:#6ce0b5}.warn{color:#ffd28b}.error{color:#ff9d9d}</style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+</head>
+<body><main><h1>🔐 AluARTmx AR · Diagnóstico v4.0</h1><p>Prueba de lectura con una cuenta real de Supabase Auth. No crea, edita ni elimina datos.</p>
+<section><h2>1. Iniciar sesión como cliente demo</h2><form id="login"><label for="email">Correo de la segunda cuenta (cliente demo)</label><input id="email" type="email" autocomplete="username" required><label for="password">Contraseña</label><input id="password" type="password" autocomplete="current-password" required><button id="submit" type="submit">Iniciar sesión y comprobar</button><button id="logout" class="secondary" type="button">Cerrar sesión</button></form><small>No pegues tus credenciales en el chat. Esta página usa la clave pública de Supabase; nunca debe contener una service_role key.</small></section>
+<section><h2>2. Resultado de la prueba</h2><pre id="result" aria-live="polite">Esperando inicio de sesión…</pre><small>La prueba verifica lecturas con las políticas RLS de la sesión autenticada. No demuestra todavía los permisos de escritura ni los permisos de Storage/R2.</small></section>
+</main><script>
+'use strict';
+const SUPABASE_URL='https://fqqtztgqlijlxyesbaqz.supabase.co';
+const SUPABASE_ANON_KEY='sb_publishable_ehoCG0dQDrMlAG6j7UpyZA_gLiChk-9';
+const EXPECTED_SLUG='empresa-demo-aluartmx';
+const result=document.getElementById('result');
+const submit=document.getElementById('submit');
+// No persistimos sesiones ni contraseñas en localStorage.
+const client=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
+function show(lines){result.textContent=lines.join('\n');}
+function fail(label,error){return label+': ERROR '+(error?.message||'desconocido');}
+async function check(){
+ const {data:{user},error:userError}=await client.auth.getUser();
+ if(userError||!user){show(['No hay sesión autenticada.']);return;}
+ const lines=['Sesión autenticada: SÍ',''];
+ const profile=await client.from('usuarios').select('rol,empresa_id').eq('id',user.id).maybeSingle();
+ if(profile.error){show([fail('Perfil',profile.error)]);return;}
+ if(!profile.data){show(['Perfil: no existe en public.usuarios']);return;}
+ const role=profile.data.rol;
+ lines.push('Rol: '+role);
+ if(role!=='cliente'){lines.push('⚠️ Esta prueba está diseñada para la cuenta CLIENTE, no superadmin.');show(lines);return;}
+ const empresas=await client.from('empresas').select('id,nombre,slug,plan');
+ const cuadros=await client.from('cuadros').select('id,empresa_id,nombre').limit(1000);
+ if(empresas.error)lines.push(fail('Empresas',empresas.error));
+ else{
+  const list=empresas.data||[];
+  lines.push('Empresas visibles: '+list.length);
+  list.forEach(e=>lines.push('  • '+e.nombre+' ('+e.slug+')'));
+  const expected=list.length===1 && list[0].slug===EXPECTED_SLUG && list[0].id===profile.data.empresa_id;
+  lines.push(expected?'✅ La lectura de empresas coincide con la empresa demo.':'⚠️ La lectura de empresas NO coincide con el resultado esperado.');
+ }
+ if(cuadros.error)lines.push(fail('Cuadros',cuadros.error));
+ else{
+  const list=cuadros.data||[];
+  lines.push('Cuadros visibles (máximo 1000): '+list.length);
+  const others=list.filter(c=>c.empresa_id!==profile.data.empresa_id);
+  lines.push(others.length===0?'✅ Ningún cuadro visible pertenece a otra empresa.':'❌ ALERTA: Hay cuadros visibles de otra empresa.');
+  if(list.length===0)lines.push('ℹ️ No hay cuadros visibles; la prueba de aislamiento de cuadros aún no es concluyente.');
+ }
+ lines.push('','Nota: si solo existe una empresa, aún falta crear otra empresa de prueba para verificar aislamiento entre dos empresas.');
+ show(lines);
+}
+document.getElementById('login').addEventListener('submit',async ev=>{
+ ev.preventDefault();submit.disabled=true;show(['Iniciando sesión y consultando permisos…']);
+ const email=document.getElementById('email').value.trim();
+ const password=document.getElementById('password').value;
+ try{
+  await client.auth.signOut();
+  const {error}=await client.auth.signInWithPassword({email,password});
+  document.getElementById('password').value='';
+  if(error){show([fail('Inicio de sesión',error)]);return;}
+  await check();
+ }catch(e){show([fail('Prueba',e)]);}finally{submit.disabled=false;}
+});
+document.getElementById('logout').addEventListener('click',async()=>{await client.auth.signOut();document.getElementById('password').value='';show(['Sesión cerrada.']);});
+</script></body></html>
