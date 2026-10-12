@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AluARTmx AR · Laboratorio v4.7.5</title>
+<style>
+:root{font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#eaf6fb;background:#07131f}
+*{box-sizing:border-box}body{margin:0;padding:28px 14px}.wrap{max-width:760px;margin:auto}
+h1{font-size:1.7rem;margin:0 0 7px}.sub{color:#9db8c6;margin-bottom:25px}
+.panel{background:#0e2333;border:1px solid #245064;border-radius:18px;padding:22px;margin-bottom:16px}
+label{display:block;margin-bottom:9px;font-weight:650}input[type=file],select{width:100%;background:#091c2a;border:1px solid #3c6678;border-radius:9px;padding:12px;color:#fff}
+select{margin-bottom:18px}button,.download{border:0;border-radius:10px;padding:13px 18px;background:#21c7ce;color:#03212b;font-weight:800;cursor:pointer;text-decoration:none;display:inline-block}
+button:disabled{opacity:.45;cursor:wait}.muted{color:#a4bdc9;font-size:.9rem;line-height:1.55}
+.progress{height:14px;background:#071622;border-radius:8px;overflow:hidden;margin:14px 0 6px}
+.bar{height:100%;background:#20c8d1;width:0%;transition:width .25s}
+#status{font-weight:700}#stats{white-space:pre-line;line-height:1.7}
+video{width:100%;max-height:340px;background:#000;border-radius:9px;margin:12px 0}
+pre{white-space:pre-wrap;word-break:break-word;background:#081724;border-radius:10px;padding:12px;color:#afc8d3;max-height:180px;overflow:auto;font-size:.75rem}
+.warning{color:#ffd695}
+</style></head><body><div class="wrap">
+<h1>AluARTmx AR <span style="color:#20c8d1">v4.7.5</span></h1>
+<div class="sub">Laboratorio web · Compresión con FFmpeg (H.264 + AAC) · Solo pruebas</div>
+<div class="panel">
+<label for="file">1. Selecciona el video original</label>
+<input type="file" id="file" accept="video/*">
+<p class="muted" id="inputInfo">No se ha seleccionado ningún archivo.</p>
+<label for="quality">2. Calidad de prueba</label>
+<select id="quality">
+<option value="balanced">Equilibrada · 720p / 30 FPS · ~950 kbps de video</option>
+<option value="detail">Más detalle · 720p / 30 FPS · ~1,600 kbps de video (puede superar 49 MiB)</option>
+<option value="full">1080p / 30 FPS · ~950 kbps de video (puede perder detalle)</option>
+</select>
+<button id="start">Optimizar video</button>
+<p class="muted warning">Abre este laboratorio desde GitHub Pages (HTTPS), no como archivo local. Esta prueba usa un motor de compresión descargado de internet. El video se procesa en tu equipo y NO se sube a AluARTmx, Supabase ni Cloudflare. Puede tardar bastante y consumir mucha memoria con videos grandes.</p>
+</div>
+<div class="panel">
+<div id="status">Esperando video…</div>
+<div class="progress"><div class="bar" id="bar"></div></div>
+<div id="percent" class="muted">0%</div>
+<div id="stats" class="muted"></div>
+<div id="result" hidden>
+<h3>Revisa el video completo antes de usarlo en AR</h3>
+<video id="preview" controls playsinline preload="metadata"></video>
+<div><a id="download" class="download">Descargar MP4 optimizado</a></div>
+<p class="muted">Comprueba que la imagen siga avanzando y el audio esté sincronizado, especialmente después de la mitad del video.</p>
+</div>
+</div>
+<div class="panel"><strong>Registro técnico</strong><pre id="log">Listo.</pre></div>
+</div>
+<script type="module">
+const $=id=>document.getElementById(id);
+const log=(s)=>{const el=$('log');el.textContent=(el.textContent+'\n'+s).slice(-10000);el.scrollTop=el.scrollHeight};
+const state=s=>$('status').textContent=s;
+const setProgress=p=>{p=Math.max(0,Math.min(100,Math.round(p)));$('bar').style.width=p+'%';$('percent').textContent=p+'%'};
+const MiB=n=>(n/1048576).toFixed(2)+' MiB';
+let currentURL=null;
+$('file').onchange=()=>{const f=$('file').files[0];$('inputInfo').textContent=f?`${f.name} · ${MiB(f.size)}`:'No se ha seleccionado ningún archivo.'};
+$('start').onclick=async()=>{
+ const file=$('file').files[0];if(!file){alert('Selecciona un video.');return}
+ if(location.protocol==='file:'){alert('Este laboratorio debe abrirse desde GitHub Pages (https://), no haciendo doble clic al archivo HTML.');return}
+ $('start').disabled=true;$('result').hidden=true;setProgress(0);$('stats').textContent='';$('log').textContent='Iniciando prueba…';
+ let ffmpeg;
+ try{
+  state('NOW LOADING… Cargando motor de compresión');
+  const base='https://cdn.jsdelivr.net/npm';
+  const [{FFmpeg},{fetchFile,toBlobURL}]=await Promise.all([
+    import(base+'/@ffmpeg/ffmpeg@0.12.15/dist/esm/index.js'),
+    import(base+'/@ffmpeg/util@0.12.2/dist/esm/index.js')
+  ]);
+  const ffmpegBase=base+'/@ffmpeg/ffmpeg@0.12.15/dist/esm';
+  const coreBase=base+'/@ffmpeg/core@0.12.10/dist/umd';
+  const workerURL=await toBlobURL(ffmpegBase+'/worker.js','text/javascript');
+  ffmpeg=new FFmpeg();
+  ffmpeg.on('log',({message})=>{if(/error|warning|time=|frame=|failed/i.test(message))log(message)});
+  ffmpeg.on('progress',({progress})=>{if(Number.isFinite(progress))setProgress(Math.min(98,progress*100))});
+  const loadPromise=ffmpeg.load({
+   classWorkerURL:workerURL,
+   coreURL:await toBlobURL(coreBase+'/ffmpeg-core.js','text/javascript'),
+   wasmURL:await toBlobURL(coreBase+'/ffmpeg-core.wasm','application/wasm')
+  });
+  await Promise.race([loadPromise,new Promise((_,reject)=>setTimeout(()=>reject(Error('La carga del motor superó 90 segundos. Revisa la consola y la conexión.')),90000))]);
+  log('Motor cargado. Copiando archivo a memoria…');
+  state('Preparando video…');
+  await ffmpeg.writeFile('entrada'+(file.name.toLowerCase().endsWith('.mov')?'.mov':'.mp4'),await fetchFile(file));
+  const input=file.name.toLowerCase().endsWith('.mov')?'entrada.mov':'entrada.mp4';
+  const mode=$('quality').value;
+  const width=mode==='full'?1920:1280;
+  const bitrate=mode==='detail'?'1600k':'950k';
+  const maxrate=mode==='detail'?'1800k':'1050k';
+  state('NOW LOADING… Comprimiendo video');
+  log(`Configuración: ${width}px máximo, 30 FPS, video ${bitrate}, audio 96k.`);
+  const started=performance.now();
+  const args=['-i',input,'-map','0:v:0','-map','0:a:0?','-vf',`scale=${width}:-2:force_original_aspect_ratio=decrease:flags=lanczos,fps=30`,'-c:v','libx264','-preset','veryfast','-b:v',bitrate,'-maxrate',maxrate,'-bufsize','2100k','-pix_fmt','yuv420p','-c:a','aac','-b:a','96k','-ar','44100','-movflags','+faststart','-y','salida.mp4'];
+  const exitCode=await ffmpeg.exec(args);
+  if(exitCode!==0)throw Error('FFmpeg terminó con código '+exitCode+'. Consulta el registro técnico.');
+  const data=await ffmpeg.readFile('salida.mp4');
+  const blob=new Blob([data],{type:'video/mp4'});
+  if(blob.size<1000)throw Error('El archivo generado está vacío.');
+  if(currentURL)URL.revokeObjectURL(currentURL);
+  currentURL=URL.createObjectURL(blob);
+  $('preview').src=currentURL;
+  $('download').href=currentURL;
+  $('download').download='AluARTmx_optimizado_'+file.name.replace(/\.[^.]+$/,'')+'.mp4';
+  const saved=(1-blob.size/file.size)*100;
+  $('stats').textContent=`Original: ${MiB(file.size)} · Optimizado: ${MiB(blob.size)} · Reducción: ${saved.toFixed(1)}%\nTiempo: ${((performance.now()-started)/60000).toFixed(1)} minutos · ${blob.size<=49*1048576?'Dentro del límite de 49 MiB':'SUPERA el límite de 49 MiB'}`;
+  $('result').hidden=false;setProgress(100);state('Video generado. Verifica imagen y sonido.');
+  log('Finalizado. Reproduce el archivo hasta el final.');
+ }catch(err){state('No se pudo completar esta prueba.');log('ERROR: '+(err?.stack||err));alert('No se pudo comprimir. Revisa el registro técnico al final de la página.')}
+ finally{$('start').disabled=false}
+};
+</script></body></html>
