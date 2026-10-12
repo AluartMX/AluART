@@ -1,0 +1,33 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AluARTmx AR · Diagnóstico v4.7.6</title><style>*{box-sizing:border-box}body{background:#061522;color:#ecf8ff;font:16px system-ui;margin:0;padding:24px}.wrap{max-width:760px;margin:auto}h1{font-size:1.8rem}h1 span{color:#21c7d0}.panel{background:#102838;border:1px solid #24596b;border-radius:16px;padding:22px;margin:18px 0}button{background:#24c7cf;border:0;border-radius:10px;padding:13px 20px;color:#00232a;font-weight:800;cursor:pointer}button:disabled{opacity:.5}p{line-height:1.6;color:#bbd1da}.status{font-weight:750}pre{background:#071a27;padding:14px;border-radius:10px;white-space:pre-wrap;overflow-wrap:anywhere;max-height:450px;overflow:auto;font-size:12px}.ok{color:#68e4a5}.bad{color:#ff9999}.warn{color:#ffd37b}</style></head><body><div class="wrap"><h1>AluARTmx AR <span>v4.7.6</span></h1><p>Diagnóstico independiente del motor FFmpeg. <b>No selecciones ni subas videos.</b> No modifica los archivos actuales de AluARTmx.</p><section class="panel"><button id="run">Probar arranque de FFmpeg</button> <button id="copy" type="button">Copiar diagnóstico</button><p class="status" id="status">Listo para comenzar.</p><p>La prueba intenta iniciar FFmpeg y ejecutar <code>-version</code>. Si algo falla, muestra el punto exacto y los últimos mensajes disponibles. Tiempo máximo aproximado: 35 segundos.</p></section><section class="panel"><b>Registro de diagnóstico</b><pre id="log">Esperando prueba…</pre></section></div><script type="module">
+const el=id=>document.getElementById(id), lines=[];let started=0;
+function log(s,type=''){const msg=`[${((performance.now()-started)/1000).toFixed(1)} s] ${s}`;lines.push(msg);el('log').textContent=lines.join('\n');el('log').scrollTop=el('log').scrollHeight;if(type)el('status').textContent=s}
+const deadline=(promise,ms,label)=>Promise.race([promise,new Promise((_,reject)=>setTimeout(()=>reject(new Error(`Tiempo agotado (${ms/1000}s): ${label}`)),ms))]);
+el('copy').onclick=async()=>{try{await navigator.clipboard.writeText(lines.join('\n'));el('status').textContent='Diagnóstico copiado.'}catch(e){el('status').textContent='Selecciona y copia manualmente el registro.'}};
+el('run').onclick=async()=>{el('run').disabled=true;lines.length=0;started=performance.now();el('log').textContent='';let ffmpeg;
+try{
+ log('Página: '+location.href);log('Protocolo: '+location.protocol);log('Navegador: '+navigator.userAgent);log('crossOriginIsolated: '+crossOriginIsolated);log('WebAssembly: '+(typeof WebAssembly!=='undefined'));log('Worker: '+(typeof Worker!=='undefined'));
+ if(location.protocol==='file:')throw Error('Abre esta prueba desde GitHub Pages, no como archivo local.');
+ log('Paso 1/5: importando biblioteca FFmpeg…','Paso 1/5: importando biblioteca');
+ const [{FFmpeg},{toBlobURL}]=await deadline(Promise.all([import('https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.15/dist/esm/index.js'),import('https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.2/dist/esm/index.js')]),15000,'importar bibliotecas');
+ log('Bibliotecas importadas correctamente.');
+ const worker='https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.15/dist/esm/worker.js';
+ const core='https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd';
+ log('Paso 2/5: descargando worker.js…','Paso 2/5: descargando Worker');
+ const workerBlob=await deadline(toBlobURL(worker,'text/javascript'),15000,'descargar worker.js');
+ log('worker.js preparado como blob.');
+ log('Paso 3/5: descargando ffmpeg-core.js y ffmpeg-core.wasm…','Paso 3/5: descargando motor');
+ const [coreURL,wasmURL]=await deadline(Promise.all([toBlobURL(core+'/ffmpeg-core.js','text/javascript'),toBlobURL(core+'/ffmpeg-core.wasm','application/wasm')]),20000,'descargar motor y WASM');
+ log('Archivos core y WASM preparados.');
+ log('Paso 4/5: inicializando Worker y WASM…','Paso 4/5: iniciando FFmpeg');
+ ffmpeg=new FFmpeg();ffmpeg.on('log',({message})=>log('FFmpeg: '+message));
+ const load=ffmpeg.load({classWorkerURL:workerBlob,coreURL,wasmURL});
+ await deadline(load,30000,'ffmpeg.load() no respondió');
+ log('FFmpeg cargado correctamente.','FFmpeg arrancó correctamente.');
+ log('Paso 5/5: ejecutando ffmpeg -version…','Paso 5/5: ejecutando prueba');
+ const code=await deadline(ffmpeg.exec(['-version']),10000,'ejecutar -version');
+ log('Código de salida: '+code);if(code!==0)throw Error('FFmpeg devolvió código '+code);
+ log('PRUEBA COMPLETADA: motor operativo.','PRUEBA COMPLETADA: motor operativo.');
+}catch(err){log('ERROR: '+(err?.stack||String(err)),'Falló la prueba. Copia el registro.');}
+finally{try{ffmpeg?.terminate()}catch{}el('run').disabled=false}
+};
+</script></body></html>
