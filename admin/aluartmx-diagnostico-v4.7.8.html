@@ -1,0 +1,31 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>AluARTmx · Diagnóstico v4.7.8</title><style>
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 0% 0%,#067a88 0%,transparent 34%),radial-gradient(ellipse at 95% 5%,#652084 0%,transparent 34%),linear-gradient(145deg,#061d3e,#080e25 68%,#200e42);color:#eafaff;font:16px system-ui,Segoe UI,sans-serif;padding:28px 15px}.wrap{max-width:790px;margin:auto}h1{margin:0;font-size:1.8rem}h1 span{color:#20d3dd}.sub{color:#b4c9df}.panel{background:#0b1d32dc;border:1px solid #31617b;border-radius:16px;padding:22px;margin:20px 0}button{background:#26c9d4;border:0;border-radius:9px;padding:12px 20px;color:#06222b;font-weight:800;cursor:pointer;margin-right:10px}button:disabled{opacity:.5;cursor:wait}pre{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.6;font-size:13px;color:#bce5e9;max-height:420px;overflow:auto}.small{color:#acc4d0;font-size:14px}.status{font-weight:700;color:#66e3e9}
+</style></head><body><div class="wrap"><h1>AluARTmx AR <span>v4.7.8</span></h1><p class="sub">Diagnóstico del motor FFmpeg · No necesita video</p><section class="panel"><p>Esta prueba descarga el archivo WASM, comprueba su firma real y lo entrega directamente al Worker. Así evitamos que FFmpeg intente abrir una ruta que devuelve HTML.</p><button id="go">Probar arranque</button><button id="copy" type="button">Copiar diagnóstico</button><p id="status" class="status">Listo para probar.</p><p class="small">Requiere internet. No sube videos ni modifica otros archivos de AluARTmx.</p></section><section class="panel"><strong>Registro técnico</strong><pre id="log">Esperando inicio…</pre></section></div><script>
+const $=x=>document.getElementById(x), coreBase='https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd/';
+let lines=[],worker=null,timer=null,started=0;
+function add(s){let t=((performance.now()-started)/1000).toFixed(1);lines.push('['+t+' s] '+s);$('log').textContent=lines.join('\n');$('log').scrollTop=$('log').scrollHeight;}
+function finish(s){clearTimeout(timer);$('go').disabled=false;$('status').textContent=s;}
+$('copy').onclick=async()=>{const txt=lines.join('\n');try{await navigator.clipboard.writeText(txt);$('status').textContent='Diagnóstico copiado.'}catch{window.prompt('Copia este diagnóstico:',txt)}};
+$('go').onclick=async()=>{
+ $('go').disabled=true;lines=[];started=performance.now();$('status').textContent='Comprobando archivo WASM…';add('URL: '+location.href);add('crossOriginIsolated: '+crossOriginIsolated);add('WebAssembly: '+typeof WebAssembly);
+ if(worker){worker.terminate();worker=null}
+ const abort=new AbortController();timer=setTimeout(()=>{abort.abort();if(worker)worker.terminate();add('ERROR: Tiempo agotado (45 s)');finish('Tiempo agotado')},45000);
+ try{
+  add('Paso 1/4: descargando ffmpeg-core.wasm…');
+  const url=coreBase+'ffmpeg-core.wasm';const response=await fetch(url,{cache:'no-store',signal:abort.signal});
+  add('HTTP '+response.status+' · Content-Type: '+response.headers.get('content-type')+' · URL final: '+response.url);
+  if(!response.ok)throw new Error('Respuesta HTTP '+response.status);
+  const buffer=await response.arrayBuffer(), bytes=new Uint8Array(buffer);
+  const signature=Array.from(bytes.slice(0,8)).map(x=>x.toString(16).padStart(2,'0')).join(' ');
+  add('Paso 2/4: '+bytes.length+' bytes; primeros 8 bytes: '+signature);
+  if(bytes[0]!==0||bytes[1]!==97||bytes[2]!==115||bytes[3]!==109){const sample=new TextDecoder().decode(bytes.slice(0,180));throw new Error('El servidor NO entregó WASM válido. Comienzo de respuesta: '+sample)}
+  add('Firma WASM correcta.');
+  add('Paso 3/4: iniciando Worker local…');
+  worker=new Worker('./aluartmx-worker-v4.7.8.js');
+  worker.onerror=e=>{add('ERROR Worker: '+e.message+' ('+e.filename+':'+e.lineno+')');finish('Error del Worker')};
+  worker.onmessage=e=>{const {type,message}=e.data||{};add('['+type+'] '+message);if(type==='success')finish('¡Motor FFmpeg iniciado correctamente!');if(type==='error')finish('Error de inicialización')};
+  add('Paso 4/4: entregando WASM directamente al Worker…');
+  worker.postMessage({coreUrl:coreBase+'ffmpeg-core.js',wasmBuffer:buffer},[buffer]);
+ }catch(e){if(!abort.signal.aborted){add('ERROR: '+(e.stack||e));finish('Error de diagnóstico')}}
+};
+</script></body></html>
