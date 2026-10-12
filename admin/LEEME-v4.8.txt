@@ -1,0 +1,13 @@
+AluARTmx AR v4.8 - Prueba comercial
+
+1. NO borres ni reemplaces el panel v4.7.12 ni ar.html.
+2. Sube SOLO al directorio admin el archivo aluartmx-panel-v4.8-prueba.html.
+3. Conserva en admin los archivos existentes mindar-compiler.js y aluartmx-worker-v4.7.10.js.
+4. Abre https://aluartmx.github.io/AluART/admin/aluartmx-panel-v4.8-prueba.html
+5. Prueba iniciar sesion y abrir Mis cuadros ANTES de crear cuadros nuevos.
+
+Novedades: URL QR nuevo dominio; pestañas Crear cuadro, Mis cuadros (galeria y QR), Perfil, Mis empresas (superadmin), conversión JFIF->JPG y diseño neón.
+
+IMPORTANTE: Se preservó el flujo de creación existente, pero esta versión nueva aún requiere pruebas reales.
+La galería muestra hasta 200 cuadros por empresa; solo lista los que las políticas RLS permiten consultar.
+El motor de compresión y los endpoints no fueron modificados.
