@@ -1,0 +1,23 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AluARTmx v4.7.7 · Diagnóstico</title><style>
+*{box-sizing:border-box}body{font:16px system-ui;background:#071426;color:#edfaff;margin:0;padding:32px 15px}main{max-width:800px;margin:auto}h1{margin-bottom:5px}em{color:#20d3df;font-style:normal}section{background:#102438;border:1px solid #26536b;border-radius:18px;padding:22px;margin:18px 0}button{background:#1dc6d4;color:#061c26;font-weight:800;border:0;border-radius:9px;padding:14px 18px;cursor:pointer;margin-right:8px;margin-bottom:8px}button:disabled{opacity:.5}#log{white-space:pre-wrap;word-break:break-word;background:#061626;padding:18px;border-radius:10px;min-height:180px;font:13px/1.7 Consolas,monospace}small{color:#a7c4d2;line-height:1.6}#status{font-weight:800;font-size:18px} .bad{color:#ffc4a5}.good{color:#6deacb}</style></head><body><main>
+<h1>AluARTmx AR <em>v4.7.7</em></h1><small>Diagnóstico del Worker y WebAssembly · No comprime videos ni modifica AluARTmx</small>
+<section><p><b>Sube este HTML y el archivo <code>aluartmx-worker-v4.7.7.js</code> a la misma carpeta <code>admin/</code> de GitHub.</b></p><button id="start">Probar arranque</button><button id="copy">Copiar diagnóstico</button><p id="status">Esperando prueba</p><small>La prueba utiliza el Worker desde tu propio GitHub Pages y el motor FFmpeg desde un CDN. Si no responde en 45 segundos, mostraremos un error.</small></section>
+<section><b>Registro técnico</b><pre id="log">Listo para iniciar.</pre></section>
+<script>
+const $=id=>document.getElementById(id);let worker=null,timer=null,started=0,finished=false;
+const log=s=>{$('log').textContent+='\n'+((performance.now()-started)/1000).toFixed(1)+' s · '+s};
+const end=(s,ok)=>{finished=true;clearTimeout(timer);$('status').textContent=s;$('status').className=ok?'good':'bad';$('start').disabled=false;if(worker){worker.terminate();worker=null}};
+$('start').onclick=()=>{
+ if(worker)worker.terminate();finished=false;started=performance.now();$('log').textContent='Diagnóstico v4.7.7';$('start').disabled=true;$('status').textContent='Iniciando Worker…';$('status').className='';
+ log('URL: '+location.href);log('crossOriginIsolated: '+crossOriginIsolated);log('WebAssembly: '+(typeof WebAssembly));log('Worker: '+(typeof Worker));
+ if(location.protocol==='file:'){end('Debes abrirlo desde GitHub Pages (HTTPS).',false);return}
+ try{
+  worker=new Worker('./aluartmx-worker-v4.7.7.js');
+  worker.onmessage=e=>{const d=e.data;log('['+d.step+'] '+d.msg);if(d.step==='success')end('¡Motor WebAssembly iniciado!',true);else if(d.step==='error')end('Fallo identificado. Copia el diagnóstico.',false);else $('status').textContent=d.msg};
+  worker.onerror=e=>{log('ERROR del Worker: '+e.message+' · '+e.filename+':'+e.lineno);end('Error del Worker. Copia el diagnóstico.',false)};
+  worker.postMessage({cmd:'start'});
+  timer=setTimeout(()=>{if(!finished){log('ERROR: Tiempo agotado (45 segundos). Última etapa registrada arriba.');end('Tiempo agotado. Copia el diagnóstico.',false)}},45000);
+ }catch(e){log('ERROR: '+String(e.stack||e));end('No se pudo iniciar el Worker.',false)}
+};
+$('copy').onclick=async()=>{const s=$('log').textContent;try{await navigator.clipboard.writeText(s);$('copy').textContent='Copiado ✓'}catch{const a=document.createElement('textarea');a.value=s;document.body.append(a);a.select();document.execCommand('copy');a.remove();$('copy').textContent='Copiado ✓'}setTimeout(()=>$('copy').textContent='Copiar diagnóstico',2000)};
+</script></main></body></html>
