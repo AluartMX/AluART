@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AluARTmx - Prueba de aislamiento Storage</title><style>
+*{box-sizing:border-box}body{margin:0;background:#0b1424;color:#eff7ff;font:16px Arial,sans-serif}header{border-bottom:1px solid #344760;padding:20px}h1{margin:0;color:#71e5dd;font-size:25px}small{color:#bad0e4}main{max-width:730px;margin:25px auto;padding:0 15px}.card{background:#1a2b43;border:1px solid #3c536e;border-radius:14px;padding:23px;margin-bottom:16px}label{display:block;margin:15px 0 6px;font-weight:bold}input{display:block;width:100%;background:#0b1628;border:1px solid #56708c;border-radius:8px;color:white;padding:12px}button{border:0;border-radius:8px;padding:13px 18px;margin:16px 7px 0 0;background:#2798a7;color:white;font-weight:bold;cursor:pointer}button:disabled{opacity:.5;cursor:wait}.secondary{background:#445e7c}.hidden{display:none}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#0b1628;padding:17px;border-radius:8px;line-height:1.6}.good{color:#7cf0c0}.bad{color:#ff9c9c}p{line-height:1.55}
+</style></head><body><header><h1>AluARTmx AR</h1><small>Prueba v4.4 · Aislamiento de Supabase Storage · No modifica cuadros</small></header><main>
+<div id="loginCard" class="card"><h2>Entrar como cliente de prueba</h2><p>Utiliza la cuenta de <strong>Empresa Demo AluARTmx</strong>, no la de superadministrador.</p><label for="email">Correo</label><input id="email" type="email" value="jinbokr2@gmail.com" autocomplete="username"><label for="password">Contraseña</label><input id="password" type="password" autocomplete="current-password"><button id="login">Iniciar sesión</button></div>
+<div id="testCard" class="card hidden"><h2>Prueba de carpeta ajena</h2><p id="account"></p><p>Intentaremos subir un archivo de texto temporal a <strong>AluARTmx</strong>, empresa distinta de la cuenta de prueba. El comportamiento correcto es que Supabase <strong>rechace</strong> la subida.</p><button id="test">Probar acceso denegado</button><button id="logout" class="secondary">Cerrar sesión</button></div>
+<div class="card"><h2>Resultado</h2><pre id="status">Esperando inicio de sesión...</pre></div>
+</main><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script><script>
+'use strict';
+const sb = supabase.createClient('https://fqqtztgqlijlxyesbaqz.supabase.co','sb_publishable_ehoCG0dQDrMlAG6j7UpyZA_gLiChk-9',{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
+const $=id=>document.getElementById(id);
+const OTHER_COMPANY='e24b9df5-9ac4-48a7-9c16-c1f8d69aa9b6';
+let currentProfile=null;
+function show(message,bad=false){$('status').textContent=message;$('status').className=bad?'bad':'good'}
+function busy(on){$('login').disabled=on;$('test').disabled=on}
+$('login').onclick=async()=>{busy(true);show('Validando cuenta...');try{
+ const {data,error}=await sb.auth.signInWithPassword({email:$('email').value.trim(),password:$('password').value});if(error)throw error;
+ $('password').value='';
+ const {data:profile,error:profileError}=await sb.from('usuarios').select('rol,empresa_id').eq('id',data.user.id).single();if(profileError)throw profileError;
+ if(profile.rol!=='cliente')throw Error('Esta prueba debe ejecutarse como cliente, no como superadministrador.');
+ if(!profile.empresa_id||profile.empresa_id===OTHER_COMPANY)throw Error('La cuenta debe pertenecer a una empresa distinta de AluARTmx.');
+ currentProfile=profile;$('account').textContent='Cuenta: '+data.user.email+' · Rol: '+profile.rol;
+ $('loginCard').classList.add('hidden');$('testCard').classList.remove('hidden');show('Sesión válida. Listo para comprobar el rechazo de una carpeta ajena.');
+ }catch(e){await sb.auth.signOut();show('No se puede continuar: '+e.message,true)}finally{busy(false)}};
+$('test').onclick=async()=>{busy(true);const path=`empresas/${OTHER_COMPANY}/pruebas-seguridad/${crypto.randomUUID()}.txt`;
+ try{
+ const {data:session}=await sb.auth.getSession();if(!session.session||!currentProfile)throw Error('Sesión no disponible. Inicia sesión de nuevo.');
+ show('Intentando escribir un archivo temporal en la carpeta de otra empresa...');
+ const {error}=await sb.storage.from('AluART').upload(path,new Blob(['Prueba controlada de aislamiento multiempresa'],{type:'text/plain'}),{contentType:'text/plain',upsert:false});
+ if(error){show('PRUEBA SUPERADA: ACCESO DENEGADO\n\nSupabase rechazó la subida a la empresa ajena.\n\nRespuesta: '+error.message+'\n\nNo se creó ningún archivo mediante esta solicitud.');return;}
+ // Si se permitió inesperadamente, intentar retirar inmediatamente el archivo de prueba.
+ const {error:removeError}=await sb.storage.from('AluART').remove([path]);
+ show('ALERTA DE SEGURIDAD: SUBIDA A EMPRESA AJENA PERMITIDA.\n\nLa política Storage necesita revisión urgente.\n'+(removeError?'NO se pudo borrar el archivo de prueba. Ruta: '+path+'\nError: '+removeError.message:'Se eliminó el archivo de prueba.')+'\n\nNo modifiques todavía las políticas sin revisar la causa.',true);
+ }catch(e){show('ERROR DE PRUEBA (resultado no concluyente): '+e.message,true)}finally{busy(false)}};
+$('logout').onclick=async()=>{await sb.auth.signOut();currentProfile=null;$('testCard').classList.add('hidden');$('loginCard').classList.remove('hidden');show('Sesión cerrada.');};
+</script></body></html>
