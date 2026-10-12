@@ -1,0 +1,238 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AluARTmx AR v4.4 - Storage</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#0b1424;color:#edf5ff;font-family:Arial,sans-serif}
+header{padding:20px;border-bottom:1px solid #30465f}
+h1{font-size:23px;margin:0;color:#70e5dc}
+small{color:#aac4dd}
+main{max-width:680px;margin:28px auto;padding:0 16px}
+section{background:#1b2b43;padding:24px;border:1px solid #38516d;border-radius:15px;margin-bottom:16px}
+h2{font-size:19px;margin-top:0}
+label{display:block;margin:14px 0 7px;font-weight:bold}
+input,select{width:100%;padding:13px;background:#0b1628;color:white;border:1px solid #526984;border-radius:8px}
+button{padding:13px 18px;margin-top:17px;background:#2799a9;color:white;border:0;border-radius:8px;font-weight:bold;cursor:pointer}
+button:disabled{opacity:.5;cursor:wait}
+pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#0b1628;padding:15px;border-radius:8px;line-height:1.5}
+.hidden{display:none}
+.ok{color:#78efbc}
+.err{color:#ff9b9b}
+</style>
+</head>
+<body>
+<header>
+<h1>AluARTmx AR</h1>
+<small>v4.4 - Prueba segura de Supabase Storage</small>
+</header>
+
+<main>
+<section id="loginSection">
+<h2>Iniciar sesión</h2>
+<label>Correo</label>
+<input id="email" type="email" autocomplete="username">
+<label>Contraseña</label>
+<input id="password" type="password" autocomplete="current-password">
+<button id="loginBtn">Entrar</button>
+</section>
+
+<section id="panel" class="hidden">
+<h2>Prueba de almacenamiento</h2>
+<p id="userInfo"></p>
+<label>Empresa</label>
+<select id="empresa"></select>
+<p><small>La prueba utiliza una carpeta temporal dentro de la empresa.</small></p>
+<button id="testBtn">Probar subida y eliminación</button>
+<button id="logoutBtn" style="background:#445d7b">Cerrar sesión</button>
+</section>
+
+<section>
+<h2>Estado</h2>
+<pre id="status">Esperando inicio de sesión...</pre>
+</section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+const URL_SB = "https://fqqtztgqlijlxyesbaqz.supabase.co";
+const KEY_SB = "sb_publishable_ehoCG0dQDrMlAG6j7UpyZA_gLiChk-9";
+const BUCKET = "AluART";
+
+const db = supabase.createClient(URL_SB, KEY_SB, {
+  auth: {
+    persistSession: false,
+    autoRefreshToken: false,
+    detectSessionInUrl: false
+  }
+});
+
+const el = id => document.getElementById(id);
+let profile = null;
+let companies = [];
+
+function status(message, error=false) {
+  el("status").textContent = message;
+  el("status").className = error ? "err" : "ok";
+}
+
+function busy(value) {
+  el("testBtn").disabled = value;
+  el("loginBtn").disabled = value;
+}
+
+async function login() {
+  busy(true);
+  status("Validando sesión...");
+  try {
+    const {data, error} = await db.auth.signInWithPassword({
+      email: el("email").value.trim(),
+      password: el("password").value
+    });
+    if (error) throw error;
+
+    el("password").value = "";
+
+    const result = await db
+      .from("usuarios")
+      .select("id,rol,empresa_id")
+      .eq("id", data.user.id)
+      .single();
+
+    if (result.error) throw result.error;
+    profile = result.data;
+
+    const companiesResult = await db
+      .from("empresas")
+      .select("id,nombre,plan,activa")
+      .eq("activa",true)
+      .order("nombre");
+
+    if (companiesResult.error) throw companiesResult.error;
+
+    companies = companiesResult.data || [];
+
+    if (profile.rol === "cliente") {
+      companies = companies.filter(
+        e => e.id === profile.empresa_id
+      );
+    }
+
+    if (!companies.length) {
+      throw new Error("No hay empresas disponibles para esta cuenta.");
+    }
+
+    const selector = el("empresa");
+    selector.replaceChildren();
+
+    for (const company of companies) {
+      const option = document.createElement("option");
+      option.value = company.id;
+      option.textContent = company.nombre + " · " + company.plan;
+      selector.appendChild(option);
+    }
+
+    selector.disabled = profile.rol !== "superadmin";
+
+    el("userInfo").textContent =
+      data.user.email + " · " + profile.rol;
+
+    el("loginSection").classList.add("hidden");
+    el("panel").classList.remove("hidden");
+
+    status("Sesión válida. Listo para probar Storage.");
+  } catch (error) {
+    status("Error: " + error.message, true);
+  } finally {
+    busy(false);
+  }
+}
+
+async function testStorage() {
+  busy(true);
+  let path = null;
+  let uploaded = false;
+
+  try {
+    const empresaId = el("empresa").value;
+    const allowed = companies.some(e => e.id === empresaId);
+
+    if (!allowed) throw new Error("Empresa no autorizada.");
+
+    const {data: sessionData, error: sessionError} =
+      await db.auth.getSession();
+
+    if (sessionError || !sessionData.session) {
+      throw new Error("Sesión expirada. Vuelve a iniciar sesión.");
+    }
+
+    path = `empresas/${empresaId}/pruebas/${crypto.randomUUID()}.txt`;
+
+    const file = new Blob(
+      ["Prueba de almacenamiento AluARTmx v4.4"],
+      {type:"text/plain"}
+    );
+
+    status("1/2 Subiendo archivo temporal...\n" + path);
+
+    const upload = await db.storage
+      .from(BUCKET)
+      .upload(path, file, {
+        contentType:"text/plain",
+        upsert:false
+      });
+
+    if (upload.error) throw upload.error;
+    uploaded = true;
+
+    status("Subida exitosa.\n2/2 Eliminando archivo temporal...");
+
+    const removal = await db.storage
+      .from(BUCKET)
+      .remove([path]);
+
+    if (removal.error) throw removal.error;
+
+    uploaded = false;
+
+    status(
+      "PRUEBA SUPERADA\n\n" +
+      "Empresa autorizada: " +
+      companies.find(e => e.id === empresaId).nombre +
+      "\n\nSubida: correcta" +
+      "\nEliminación: correcta" +
+      "\n\nNo se modificaron cuadros ni videos."
+    );
+
+  } catch (error) {
+    status(
+      "PRUEBA FALLIDA\n\n" +
+      error.message +
+      (uploaded && path
+        ? "\n\nArchivo temporal pendiente de eliminar:\n" + path
+        : ""),
+      true
+    );
+  } finally {
+    busy(false);
+  }
+}
+
+async function logout() {
+  await db.auth.signOut();
+  profile = null;
+  companies = [];
+  el("panel").classList.add("hidden");
+  el("loginSection").classList.remove("hidden");
+  status("Sesión cerrada.");
+}
+
+el("loginBtn").addEventListener("click",login);
+el("testBtn").addEventListener("click",testStorage);
+el("logoutBtn").addEventListener("click",logout);
+</script>
+</body>
+</html>
